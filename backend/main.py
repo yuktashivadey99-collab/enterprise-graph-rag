@@ -163,9 +163,10 @@ def get_system_telemetry():
         },
         "bm25_keyword_store": {
             "status": "OPERATIONAL",
-            "engine": "Rank-BM25 + Pickle Serialization",
+            "engine": "Custom BM25 + Pickle Serialization",
             "indexed_documents": keyword_store.doc_count,
-            "vocabulary_size": len(keyword_store.bm25.doc_len) if hasattr(keyword_store.bm25, "doc_len") else 0
+            "vocabulary_size": len(keyword_store.inverted_index),
+            "avg_doc_length": round(keyword_store.avg_doc_length, 2)
         },
         "blockchain_audit_ledger": {
             "status": "VALID" if chain_integrity["valid"] else "COMPROMISED",
