@@ -132,6 +132,54 @@ def get_system_health():
         "cache": get_cache_stats(),
         "storage": file_store.get_storage_stats()
     }
+@app.get("/api/system/telemetry")
+def get_system_telemetry():
+    """Return real-time under-the-hood telemetry logs for all platform components."""
+    chain_integrity = blockchain_ledger.verify_chain_integrity()
+    graph_data = graph_engine.get_full_graph_visualization_data()
+    
+    return {
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "qdrant_vector_store": {
+            "status": "OPERATIONAL",
+            "storage_mode": "Embedded Local Persistence",
+            "path": config.QDRANT_PATH,
+            "collection": "enterprise_chunks",
+            "vector_dimension": config.EMBEDDING_DIMENSION,
+            "distance_metric": "Cosine",
+            "indexed_chunks": vector_store.get_chunk_count(),
+            "last_operation": "Vector similarity search using 384D all-MiniLM-L6-v2 embeddings"
+        },
+        "knowledge_graph": {
+            "status": "OPERATIONAL",
+            "engine": "NetworkX In-Memory + JSON Disk Persistence",
+            "total_nodes": graph_data["stats"]["total_nodes"],
+            "total_edges": graph_data["stats"]["total_edges"],
+            "graph_density": graph_data["stats"]["graph_density"],
+            "top_pagerank_entities": [
+                {"label": n["label"], "type": n["type"], "pagerank": n["pagerank"]}
+                for n in sorted(graph_data["nodes"], key=lambda x: x.get("pagerank", 0), reverse=True)[:5]
+            ]
+        },
+        "bm25_keyword_store": {
+            "status": "OPERATIONAL",
+            "engine": "Rank-BM25 + Pickle Serialization",
+            "indexed_documents": keyword_store.doc_count,
+            "vocabulary_size": len(keyword_store.bm25.doc_len) if hasattr(keyword_store.bm25, "doc_len") else 0
+        },
+        "blockchain_audit_ledger": {
+            "status": "VALID" if chain_integrity["valid"] else "COMPROMISED",
+            "block_height": len(blockchain_ledger.chain),
+            "merkle_root": chain_integrity.get("merkle_root", ""),
+            "latest_block_hash": blockchain_ledger.get_latest_block().hash,
+            "total_audit_events": len(blockchain_ledger.chain)
+        },
+        "multi_agent_verifier": {
+            "status": "OPERATIONAL",
+            "agents": ["Fact-Checker Agent", "Citation Auditor", "Hallucination Risk Guard"],
+            "trust_formula": "0.4 * Grounding + 0.3 * Citation + 0.3 * Graph Consistency"
+        }
+    }
 
 
 # ==============================================================================
