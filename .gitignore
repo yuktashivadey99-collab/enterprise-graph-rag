@@ -39,6 +39,8 @@ frontend/dist/
 # Data & storage
 backend/data/
 *Cachehuggingface*
+sample docs/
+sampledocs/
 *.log
 *.sqlite3
 
