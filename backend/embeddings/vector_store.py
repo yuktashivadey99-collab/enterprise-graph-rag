@@ -1,79 +1,135 @@
-import numpy as np
-import math
-import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance, VectorParams, PointStruct,
+    Filter, FieldCondition, MatchValue, SearchRequest
+)
+import uuid
+
+from config import config
+from embeddings.embedding_model import embed_texts, embed_query
+
+COLLECTION_NAME = "enterprise_chunks"
+
 
 class VectorStore:
-    def __init__(self, vector_dim: int = 128):
-        self.vector_dim = vector_dim
-        self.chunks: List[Dict[str, Any]] = []
-        self.vectors: List[np.ndarray] = []
-        self.vocab: Dict[str, int] = {}
-        self.idf: Dict[str, float] = {}
+    def __init__(self):
+        # Embedded mode - persistent to disk, no server needed
+        self.client = QdrantClient(path=config.QDRANT_PATH)
+        self._ensure_collection()
+        print(f"[VectorStore] Qdrant embedded initialized at '{config.QDRANT_PATH}'")
 
-    def _tokenize(self, text: str) -> List[str]:
-        return re.findall(r'\b[a-zA-Z0-9_-]+\b', text.lower())
+    def _ensure_collection(self):
+        """Create collection if it doesn't exist."""
+        existing = [c.name for c in self.client.get_collections().collections]
+        if COLLECTION_NAME not in existing:
+            self.client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=VectorParams(
+                    size=config.EMBEDDING_DIMENSION,
+                    distance=Distance.COSINE
+                )
+            )
+            print(f"[VectorStore] Created Qdrant collection '{COLLECTION_NAME}'")
 
-    def _build_embedding(self, text: str) -> np.ndarray:
-        tokens = self._tokenize(text)
-        if not tokens:
-            return np.zeros(self.vector_dim, dtype=np.float32)
-
-        vec = np.zeros(self.vector_dim, dtype=np.float32)
-        for token in tokens:
-            h = hash(token)
-            dim_idx = abs(h) % self.vector_dim
-            weight = self.idf.get(token, 1.0)
-            sign = 1.0 if (h % 2 == 0) else -1.0
-            vec[dim_idx] += sign * weight
-
-        norm = np.linalg.norm(vec)
-        if norm > 0:
-            vec = vec / norm
-
-        return vec
+    @property
+    def chunks(self) -> List[Dict[str, Any]]:
+        """Return a list of stored chunk payloads (for compatibility check)."""
+        try:
+            result = self.client.scroll(
+                collection_name=COLLECTION_NAME,
+                limit=1,
+                with_payload=True,
+                with_vectors=False
+            )
+            # Return count as a list mock - just checking if empty
+            count_info = self.client.count(collection_name=COLLECTION_NAME)
+            return [None] * count_info.count  # lightweight mock for len() checks
+        except Exception:
+            return []
 
     def add_chunks(self, chunks: List[Dict[str, Any]]):
-        doc_count = len(self.chunks) + len(chunks)
-        doc_freqs: Dict[str, int] = {}
-        
-        for c in chunks:
-            tokens = set(self._tokenize(c["content"]))
-            for t in tokens:
-                doc_freqs[t] = doc_freqs.get(t, 0) + 1
+        """Embed and upsert chunks into Qdrant."""
+        if not chunks:
+            return
 
-        for token, count in doc_freqs.items():
-            self.idf[token] = math.log((doc_count + 1) / (count + 1)) + 1.0
+        texts = [c["content"] for c in chunks]
+        embeddings = embed_texts(texts)
 
-        for c in chunks:
-            vec = self._build_embedding(c["content"])
-            self.chunks.append(c)
-            self.vectors.append(vec)
+        points = []
+        for chunk, vector in zip(chunks, embeddings):
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk["chunk_id"]))
+            # Convert UUID to int for Qdrant (required)
+            point_id_int = int(uuid.UUID(point_id)) % (2**63)
 
-    def similarity_search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        if not self.vectors:
-            return []
+            payload = {
+                "chunk_id": chunk["chunk_id"],
+                "document_id": chunk["document_id"],
+                "filename": chunk["filename"],
+                "page_num": chunk.get("page_num", 1),
+                "chunk_index": chunk.get("chunk_index", 0),
+                "content": chunk["content"],
+                "word_count": chunk.get("word_count", 0),
+                "department": chunk.get("department", ""),
+                "file_type": chunk.get("file_type", ""),
+            }
 
-        query_vec = self._build_embedding(query)
-        query_norm = np.linalg.norm(query_vec)
-        
-        if query_norm == 0:
-            return []
+            points.append(PointStruct(
+                id=point_id_int,
+                vector=vector,
+                payload=payload
+            ))
 
-        results = []
-        for idx, doc_vec in enumerate(self.vectors):
-            dot_product = np.dot(query_vec, doc_vec)
-            score = float(dot_product)
-            
-            chunk_data = self.chunks[idx].copy()
-            chunk_data["vector_score"] = max(0.0, score)
-            results.append(chunk_data)
+        self.client.upsert(collection_name=COLLECTION_NAME, points=points)
+        print(f"[VectorStore] Upserted {len(points)} chunks into Qdrant.")
 
-        results.sort(key=lambda x: x["vector_score"], reverse=True)
-        return results[:top_k]
+    def similarity_search(
+        self,
+        query: str,
+        top_k: int = 5,
+        department_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Search for similar chunks using cosine similarity."""
+        query_vector = embed_query(query)
+
+        search_filter = None
+        if department_filter:
+            search_filter = Filter(
+                must=[FieldCondition(key="department", match=MatchValue(value=department_filter))]
+            )
+
+        try:
+            results = self.client.query_points(
+                collection_name=COLLECTION_NAME,
+                query=query_vector,
+                limit=top_k,
+                query_filter=search_filter,
+                with_payload=True
+            ).points
+        except Exception:
+            results = self.client.search(
+                collection_name=COLLECTION_NAME,
+                query_vector=query_vector,
+                limit=top_k,
+                query_filter=search_filter,
+                with_payload=True
+            )
+
+        chunks = []
+        for hit in results:
+            chunk_data = dict(hit.payload)
+            chunk_data["vector_score"] = float(hit.score)
+            chunks.append(chunk_data)
+
+        return chunks
+
+    def get_chunk_count(self) -> int:
+        try:
+            return self.client.count(collection_name=COLLECTION_NAME).count
+        except Exception:
+            return 0
 
     def clear(self):
-        self.chunks.clear()
-        self.vectors.clear()
-        self.vocab.clear()
-        self.idf.clear()
+        """Drop and recreate the collection."""
+        self.client.delete_collection(COLLECTION_NAME)
+        self._ensure_collection()
