@@ -1,1006 +1,967 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Network as VisNetwork } from 'vis-network';
 import {
   Network, Database, ShieldCheck, FileText, Search, Upload,
   Sliders, CheckCircle2, RefreshCw, Lock, Sparkles, LogIn,
-  LogOut, User, Clock, Activity, Eye, EyeOff, Send, Layers,
-  AlertTriangle, ArrowRight, Zap, Info, FileCode, Check, Cpu,
-  Terminal, Server, CheckSquare, Hash, BookOpen
+  LogOut, User, Clock, Activity, Eye, EyeOff, Send,
+  AlertTriangle, FileCode, Terminal, Hash, X, Menu,
+  TrendingUp, ChevronRight, Inbox, Shield
 } from 'lucide-react';
-import { Network as VisNetwork } from 'vis-network';
 
-// ============================================================
-// API Helpers (Target Direct Port 8000)
-// ============================================================
-const API_BASE = 'http://localhost:8000';
-
+/* ================================================================
+   API LAYER
+   ================================================================ */
+const API = 'http://localhost:8000';
 const api = {
-  getToken: () => localStorage.getItem('rag_token'),
-  setToken: (t) => localStorage.setItem('rag_token', t),
-  clearToken: () => localStorage.removeItem('rag_token'),
-  headers: () => ({
+  t: () => localStorage.getItem('rag_token'),
+  set: (v) => localStorage.setItem('rag_token', v),
+  clear: () => localStorage.removeItem('rag_token'),
+  hdrs: () => ({
     'Content-Type': 'application/json',
-    ...(localStorage.getItem('rag_token') ? { Authorization: `Bearer ${localStorage.getItem('rag_token')}` } : {})
+    ...(localStorage.getItem('rag_token') ? { Authorization: `Bearer ${localStorage.getItem('rag_token')}` } : {}),
   }),
-  async get(url) {
-    try {
-      const res = await fetch(API_BASE + url, { headers: this.headers() });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (e) {
-      return null;
-    }
+  async get(p) {
+    try { const r = await fetch(API + p, { headers: this.hdrs() }); return r.ok ? r.json() : null; }
+    catch { return null; }
   },
-  async post(url, body) {
+  async post(p, b) {
     try {
-      const res = await fetch(API_BASE + url, { method: 'POST', headers: this.headers(), body: JSON.stringify(body) });
-      const data = await res.json().catch(() => ({}));
-      return { ok: res.ok, status: res.status, data };
-    } catch (e) {
-      return { ok: false, status: 500, data: { detail: 'Server connection failed.' } };
-    }
+      const r = await fetch(API + p, { method: 'POST', headers: this.hdrs(), body: JSON.stringify(b) });
+      const d = await r.json().catch(() => ({}));
+      return { ok: r.ok, data: d };
+    } catch { return { ok: false, data: { detail: 'Cannot reach server.' } }; }
   },
-  async postForm(url, formData) {
+  async upload(p, form) {
     try {
-      const headers = {};
-      if (this.getToken()) headers['Authorization'] = `Bearer ${this.getToken()}`;
-      const res = await fetch(API_BASE + url, { method: 'POST', headers, body: formData });
-      const data = await res.json().catch(() => ({}));
-      return { ok: res.ok, status: res.status, data };
-    } catch (e) {
-      return { ok: false, status: 500, data: { detail: 'File upload failed.' } };
-    }
-  }
+      const h = {}; if (this.t()) h.Authorization = `Bearer ${this.t()}`;
+      const r = await fetch(API + p, { method: 'POST', headers: h, body: form });
+      const d = await r.json().catch(() => ({}));
+      return { ok: r.ok, data: d };
+    } catch { return { ok: false, data: { detail: 'Upload failed.' } }; }
+  },
 };
 
-// ============================================================
-// Auth Page (Sign In / Register)
-// ============================================================
+/* ================================================================
+   MICRO-COMPONENTS
+   ================================================================ */
+
+const Spinner = ({ size = 15 }) => (
+  <RefreshCw size={size} className="spin" />
+);
+
+const RiskBadge = ({ risk }) => {
+  if (!risk) return null;
+  const m = { LOW: 'badge-green', MEDIUM: 'badge-amber', HIGH: 'badge-red' };
+  return <span className={`badge ${m[risk] || 'badge-slate'}`}>{risk} risk</span>;
+};
+
+const TrustRing = ({ score }) => {
+  const s = Math.max(0, Math.min(100, score || 0));
+  const r = 30; const c = 2 * Math.PI * r;
+  const col = s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#ef4444';
+  return (
+    <div style={{ textAlign: 'center', flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: 74, height: 74 }}>
+        <svg width="74" height="74" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="37" cy="37" r={r} stroke="#f0f2f7" strokeWidth="6" fill="none" />
+          <circle cx="37" cy="37" r={r} stroke={col} strokeWidth="6" fill="none"
+            strokeDasharray={c} strokeDashoffset={c - (s / 100) * c}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 0.7s cubic-bezier(0.16,1,0.3,1)' }}
+          />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 16, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{s}</span>
+          <span style={{ fontSize: 8, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>trust</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PageHeader = ({ icon: Icon, color = '#6366f1', title, sub, action }) => (
+  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="section-icon">
+        <Icon size={18} color={color} />
+      </div>
+      <div>
+        <h2 className="page-title">{title}</h2>
+        {sub && <p className="page-sub">{sub}</p>}
+      </div>
+    </div>
+    {action}
+  </div>
+);
+
+const EmptyState = ({ icon: Icon, message }) => (
+  <div style={{ textAlign: 'center', padding: '60px 24px', color: '#9ca3af' }}>
+    <div style={{ width: 52, height: 52, borderRadius: 16, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+      <Icon size={24} color="#a5b4fc" />
+    </div>
+    <p style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>{message}</p>
+  </div>
+);
+
+/* ================================================================
+   AUTH PAGE
+   ================================================================ */
 function AuthPage({ onLogin }) {
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ username: '', email: '', password: '', full_name: '', department: '' });
-  const [error, setError] = useState('');
+  const [f, setF] = useState({ username: '', email: '', password: '', full_name: '', department: '' });
+  const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const url = mode === 'login' ? '/auth/login' : '/auth/register';
-      const body = mode === 'login'
-        ? { username: form.username, password: form.password }
-        : { username: form.username, email: form.email, password: form.password, full_name: form.full_name, department: form.department };
-
-      const res = await api.post(url, body);
-      if (res.ok && res.data && res.data.access_token) {
-        api.setToken(res.data.access_token);
-        onLogin(res.data);
-      } else {
-        setError(res.data.detail || 'Authentication failed.');
-      }
-    } catch (err) {
-      setError('Cannot connect to backend server. Make sure Python main.py is running.');
-    } finally {
-      setLoading(false);
-    }
+  const submit = async (e) => {
+    e.preventDefault(); setErr(''); setLoading(true);
+    const res = await api.post(
+      mode === 'login' ? '/auth/login' : '/auth/register',
+      mode === 'login' ? { username: f.username, password: f.password } : f
+    );
+    if (res.ok && res.data?.access_token) { api.set(res.data.access_token); onLogin(res.data); }
+    else setErr(res.data?.detail || 'Authentication failed.');
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-2xl shadow-2xl shadow-blue-500/25 mb-4 ring-1 ring-white/20">
-            <Network className="w-9 h-9 text-white" />
+    <div className="auth-bg">
+      <div className="auth-orb-1" />
+      <div className="auth-orb-2" />
+
+      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }} className="scale-in">
+        {/* Brand */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ display: 'inline-flex', padding: 14, borderRadius: 18, background: 'linear-gradient(135deg,#4f46e5,#8b5cf6)', boxShadow: '0 8px 28px rgba(79,70,229,0.50)', border: '1px solid rgba(255,255,255,0.18)', marginBottom: 14 }}>
+            <Network size={26} color="#fff" />
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">Enterprise Graph-RAG</h1>
-          <p className="text-slate-400 text-sm mt-1.5 font-medium">Knowledge Intelligence Platform</p>
+          <h1 style={{ margin: '0 0 4px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
+            Enterprise <span className="gradient-text">Graph-RAG</span>
+          </h1>
+          <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(255,255,255,0.40)', fontWeight: 500 }}>
+            Knowledge Intelligence Platform · v2.0
+          </p>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl ring-1 ring-slate-800">
-          <div className="flex bg-slate-800/90 p-1 rounded-xl mb-6 ring-1 ring-slate-700">
-            <button
-              onClick={() => { setMode('login'); setError(''); }}
-              className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${mode === 'login' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setMode('register'); setError(''); }}
-              className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${mode === 'register' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Create Account
-            </button>
+        <div className="auth-card">
+          {/* Mode Switcher */}
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 4, marginBottom: 26, border: '1px solid rgba(255,255,255,0.07)' }}>
+            {['login', 'register'].map(m => (
+              <button key={m} onClick={() => { setMode(m); setErr(''); }}
+                className={`auth-mode-btn ${mode === m ? 'active' : 'inactive'}`}>
+                {m === 'login' ? 'Sign In' : 'Create Account'}
+              </button>
+            ))}
           </div>
 
-          {error && (
-            <div className="mb-5 p-3.5 bg-red-500/15 border border-red-500/40 rounded-xl text-red-300 text-xs font-semibold flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
+          {err && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, marginBottom: 18, fontSize: 12.5, color: '#fca5a5', fontWeight: 500 }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0 }} /> {err}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Username</label>
-              <input
-                type="text" required
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                placeholder="username"
-              />
-            </div>
+          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {[
+              { key: 'username', label: 'Username', placeholder: 'your_username', type: 'text', show: true },
+              { key: 'email', label: 'Email Address', placeholder: 'user@company.com', type: 'email', show: mode === 'register' },
+              { key: 'full_name', label: 'Full Name', placeholder: 'Alex Smith', type: 'text', show: mode === 'register' },
+              { key: 'department', label: 'Department', placeholder: 'Technology / HR / Legal', type: 'text', show: mode === 'register' },
+            ].filter(fi => fi.show).map(fi => (
+              <label key={fi.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.01em' }}>{fi.label}</span>
+                <input type={fi.type} required value={f[fi.key]} placeholder={fi.placeholder}
+                  onChange={e => setF(p => ({ ...p, [fi.key]: e.target.value }))}
+                  className="auth-input" />
+              </label>
+            ))}
 
-            {mode === 'register' && (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
-                  <input
-                    type="email" required
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                    placeholder="user@company.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Full Name</label>
-                  <input
-                    type="text"
-                    value={form.full_name}
-                    onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                    placeholder="Alex Smith"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Department</label>
-                  <input
-                    type="text"
-                    value={form.department}
-                    onChange={(e) => setForm({ ...form, department: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                    placeholder="Technology / HR / Legal"
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPwd ? 'text' : 'password'} required
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition pr-10"
-                  placeholder="••••••••"
-                />
-                <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
-                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.01em' }}>Password</span>
+              <div style={{ position: 'relative' }}>
+                <input type={showPwd ? 'text' : 'password'} required value={f.password} placeholder="••••••••"
+                  onChange={e => setF(p => ({ ...p, password: e.target.value }))}
+                  className="auth-input" style={{ paddingRight: 42 }} />
+                <button type="button" onClick={() => setShowPwd(p => !p)}
+                  style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, display: 'flex' }}>
+                  {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-            </div>
+            </label>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition shadow-lg shadow-blue-500/25 disabled:opacity-60 mt-2"
-            >
-              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-              <span>{loading ? 'Authenticating...' : (mode === 'login' ? 'Sign In to Workspace' : 'Create Account')}</span>
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ marginTop: 6, padding: '12px 20px', fontSize: 14, borderRadius: 11, width: '100%' }}>
+              {loading ? <Spinner /> : <LogIn size={15} />}
+              {loading ? 'Authenticating…' : mode === 'login' ? 'Sign In to Workspace' : 'Create Account'}
             </button>
           </form>
         </div>
+
+        <p style={{ textAlign: 'center', marginTop: 18, fontSize: 11, color: 'rgba(255,255,255,0.22)' }}>
+          Secured with JWT · Powered by Gemini 2.0 Flash
+        </p>
       </div>
     </div>
   );
 }
 
-// ============================================================
-// Main Application Component
-// ============================================================
+/* ================================================================
+   MAIN APP
+   ================================================================ */
 export default function App() {
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('chat');
+  const [tab, setTab] = useState('rag');
+  const [sidebar, setSidebar] = useState(true);
+
   const [health, setHealth] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [showGuide, setShowGuide] = useState(true);
-
-  // Search Parameters
-  const [query, setQuery] = useState('');
-  const [queryResponse, setQueryResponse] = useState(null);
-  const [vectorWeight, setVectorWeight] = useState(0.4);
-  const [keywordWeight, setKeywordWeight] = useState(0.3);
-  const [graphWeight, setGraphWeight] = useState(0.3);
-  const [departmentFilter, setDepartmentFilter] = useState('');
-  const [useReranker, setUseReranker] = useState(true);
-
-  // Live Token Streaming State
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamedAnswer, setStreamedAnswer] = useState('');
-  const [streamMeta, setStreamMeta] = useState(null);
-
-  // Knowledge Graph Canvas
   const [graphData, setGraphData] = useState(null);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const visJsRef = useRef(null);
+  const [ledger, setLedger] = useState({ blocks: [], chain_integrity: { valid: true } });
+  const [docs, setDocs] = useState([]);
+  const [history, setHistory] = useState([]);
 
-  // Data Stores (Defensive arrays)
-  const [ledgerData, setLedgerData] = useState({ blocks: [], chain_integrity: { valid: true } });
-  const [documents, setDocuments] = useState([]);
-  const [chatHistory, setChatHistory] = useState([]);
+  const [query, setQuery] = useState('');
+  const [queryRes, setQueryRes] = useState(null);
+  const [weights, setWeights] = useState({ vector: 0.4, keyword: 0.3, graph: 0.3 });
+  const [dept, setDept] = useState('');
+  const [reranker, setReranker] = useState(true);
+  const [querying, setQuerying] = useState(false);
 
-  // Live Document Ingestion Log State
-  const [activeIngestionDocId, setActiveIngestionDocId] = useState(null);
-  const [ingestionLogs, setIngestionLogs] = useState([]);
-  const [ingestionComplete, setIngestionComplete] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamText, setStreamText] = useState('');
+  const [streamDone, setStreamDone] = useState(null);
 
-  // Validate user session
+  const [uploading, setUploading] = useState(false);
+  const [ingDocId, setIngDocId] = useState(null);
+  const [ingLogs, setIngLogs] = useState([]);
+  const [ingDone, setIngDone] = useState(false);
+
+  const visRef = useRef(null);
+  const [selNode, setSelNode] = useState(null);
+  const [seeding, setSeeding] = useState(false);
+
   useEffect(() => {
-    const token = api.getToken();
-    if (token) {
-      api.get('/auth/me').then(data => {
-        if (data && data.id) setUser(data);
-      });
-    }
+    if (api.t()) api.get('/auth/me').then(d => d?.id && setUser(d));
   }, []);
 
-  // Refresh system data
-  useEffect(() => {
-    fetchHealth();
-    fetchTelemetry();
-    fetchGraphData();
-    fetchLedger();
-    fetchDocuments();
-    fetchHistory();
+  const refresh = useCallback(async () => {
+    const [h, t, g, l, d, hist] = await Promise.all([
+      api.get('/api/health'), api.get('/api/system/telemetry'),
+      api.get('/api/graph/visualization'), api.get('/api/blockchain/ledger'),
+      api.get('/api/documents'), api.get('/api/history'),
+    ]);
+    if (h?.status)             setHealth(h);
+    if (t?.qdrant_vector_store) setTelemetry(t);
+    if (g?.nodes)              setGraphData(g);
+    if (Array.isArray(l?.blocks)) setLedger(l);
+    if (Array.isArray(d))      setDocs(d);
+    if (Array.isArray(hist))   setHistory(hist);
   }, []);
 
-  const fetchHealth = async () => {
-    const data = await api.get('/api/health');
-    if (data && data.status) setHealth(data);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  /* vis-network */
+  useEffect(() => {
+    if (tab !== 'graph' || !visRef.current || !graphData?.nodes?.length) return;
+    const nodes = graphData.nodes.slice(0, 300).map(n => ({
+      id: n.id, label: n.label, group: n.type,
+      title: `${n.type} · PR: ${n.pagerank}`,
+      size: Math.max(12, Math.min(32, 12 + (n.pagerank || 0) * 800)),
+    }));
+    const edges = (graphData.edges || []).slice(0, 600).map(e => ({
+      from: e.from, to: e.to, label: e.label || '', arrows: 'to',
+      font: { align: 'middle', size: 10, color: '#9ca3af' },
+    }));
+    const net = new VisNetwork(visRef.current, { nodes, edges }, {
+      nodes: {
+        shape: 'dot', font: { size: 12, color: '#1a1d2e', face: 'Inter' },
+        borderWidth: 2.5, shadow: { enabled: true, color: 'rgba(0,0,0,0.12)', size: 6 },
+      },
+      groups: {
+        ORGANIZATION: { color: { background: '#eff6ff', border: '#3b82f6', highlight: { background: '#dbeafe', border: '#2563eb' } } },
+        TECHNOLOGY:   { color: { background: '#f5f3ff', border: '#7c3aed', highlight: { background: '#ede9fe', border: '#6d28d9' } } },
+        CONCEPT:      { color: { background: '#ecfdf5', border: '#059669', highlight: { background: '#d1fae5', border: '#047857' } } },
+        METRIC:       { color: { background: '#fffbeb', border: '#d97706', highlight: { background: '#fef3c7', border: '#b45309' } } },
+        PERSON:       { color: { background: '#fdf2f8', border: '#db2777', highlight: { background: '#fce7f3', border: '#be185d' } } },
+        LOCATION:     { color: { background: '#ecfeff', border: '#0891b2', highlight: { background: '#cffafe', border: '#0e7490' } } },
+        ENTITY:       { color: { background: '#f8fafc', border: '#94a3b8', highlight: { background: '#f1f5f9', border: '#64748b' } } },
+      },
+      edges: { color: { color: '#e5e7eb', highlight: '#6366f1' }, width: 1.5, smooth: { type: 'continuous' } },
+      physics: {
+        forceAtlas2Based: { gravitationalConstant: -28, centralGravity: 0.004, springLength: 240, springConstant: 0.15 },
+        maxVelocity: 140, solver: 'forceAtlas2Based',
+        stabilization: { iterations: 160 },
+      },
+    });
+    net.on('click', p => setSelNode(p.nodes[0] ? graphData.nodes.find(n => n.id === p.nodes[0]) : null));
+    return () => net.destroy();
+  }, [tab, graphData]);
+
+  /* ingestion log polling */
+  useEffect(() => {
+    if (!ingDocId || ingDone) return;
+    const iv = setInterval(async () => {
+      const r = await api.get(`/api/documents/${ingDocId}/logs`);
+      if (r?.logs) setIngLogs(r.logs);
+      if (r?.is_complete) { setIngDone(true); clearInterval(iv); refresh(); }
+    }, 700);
+    return () => clearInterval(iv);
+  }, [ingDocId, ingDone, refresh]);
+
+  if (!user) return <AuthPage onLogin={d => setUser(d)} />;
+
+  /* actions */
+  const seed = async () => {
+    setSeeding(true);
+    await api.post('/api/seed_demo', {});
+    await refresh();
+    setSeeding(false);
   };
 
-  const fetchTelemetry = async () => {
-    const data = await api.get('/api/system/telemetry');
-    if (data && data.qdrant_vector_store) setTelemetry(data);
+  const runQuery = async (e) => {
+    e.preventDefault(); if (!query.trim()) return;
+    setQuerying(true); setQueryRes(null); setStreamText(''); setStreamDone(null);
+    const r = await api.post('/api/query', {
+      query, vector_weight: +weights.vector, keyword_weight: +weights.keyword,
+      graph_weight: +weights.graph, top_k: 5, department_filter: dept || null, use_reranker: reranker,
+    });
+    if (r.ok) { setQueryRes(r.data); refresh(); }
+    else alert(r.data?.detail || 'Query failed');
+    setQuerying(false);
   };
 
-  const fetchGraphData = async () => {
-    const data = await api.get('/api/graph/visualization');
-    if (data && data.nodes) setGraphData(data);
-  };
-
-  const fetchLedger = async () => {
-    const data = await api.get('/api/blockchain/ledger');
-    if (data && Array.isArray(data.blocks)) setLedgerData(data);
-  };
-
-  const fetchDocuments = async () => {
-    const data = await api.get('/api/documents');
-    if (Array.isArray(data)) setDocuments(data);
-  };
-
-  const fetchHistory = async () => {
-    const data = await api.get('/api/history');
-    if (Array.isArray(data)) setChatHistory(data);
-  };
-
-  const handleLogout = () => {
-    api.clearToken();
-    setUser(null);
-  };
-
-  const seedDemoData = async () => {
-    setLoading(true);
+  const runStream = async (e) => {
+    e.preventDefault(); if (!query.trim()) return;
+    setStreaming(true); setStreamText(''); setStreamDone(null); setQueryRes(null);
     try {
-      await api.post('/api/seed_demo', {});
-      await Promise.all([fetchHealth(), fetchTelemetry(), fetchGraphData(), fetchLedger(), fetchDocuments()]);
-    } finally { setLoading(false); }
-  };
-
-  // Upload file with live log streaming
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    setIngestionLogs([]);
-    setIngestionComplete(false);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('department', departmentFilter || '');
-
-    try {
-      const res = await api.postForm('/api/upload', formData);
-      if (res.ok && res.data && res.data.document_id) {
-        const docId = res.data.document_id;
-        setActiveIngestionDocId(docId);
-        
-        // Poll step logs
-        const interval = setInterval(async () => {
-          const logRes = await api.get(`/api/documents/${docId}/logs`);
-          if (logRes && Array.isArray(logRes.logs)) {
-            setIngestionLogs(logRes.logs);
-          }
-          if (logRes && logRes.is_complete) {
-            setIngestionComplete(true);
-            clearInterval(interval);
-            fetchHealth();
-            fetchTelemetry();
-            fetchGraphData();
-            fetchDocuments();
-          }
-        }, 600);
-      } else {
-        alert(res.data.detail || 'Upload failed.');
-      }
-    } catch (err) {
-      alert(`Upload error: ${err.message}`);
-    } finally { setUploading(false); }
-  };
-
-  // Instant Query
-  const handleQuerySubmit = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setLoading(true);
-    setQueryResponse(null);
-    try {
-      const res = await api.post('/api/query', {
-        query,
-        vector_weight: parseFloat(vectorWeight),
-        keyword_weight: parseFloat(keywordWeight),
-        graph_weight: parseFloat(graphWeight),
-        top_k: 5,
-        department_filter: departmentFilter || null,
-        use_reranker: useReranker
+      const r = await fetch(API + '/api/query/stream', {
+        method: 'POST', headers: api.hdrs(),
+        body: JSON.stringify({ query, vector_weight: +weights.vector, keyword_weight: +weights.keyword, graph_weight: +weights.graph, top_k: 5, department_filter: dept || null, use_reranker: reranker }),
       });
-      if (res.ok && res.data) {
-        setQueryResponse(res.data);
-        fetchHealth();
-        fetchTelemetry();
-        fetchLedger();
-        fetchHistory();
-      } else {
-        alert(res.data.detail || 'Query failed.');
-      }
-    } finally { setLoading(false); }
-  };
-
-  // SSE Stream Query
-  const handleStreamQuery = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setIsStreaming(true);
-    setStreamedAnswer('');
-    setStreamMeta(null);
-    setQueryResponse(null);
-
-    try {
-      const res = await fetch(API_BASE + '/api/query/stream', {
-        method: 'POST',
-        headers: api.headers(),
-        body: JSON.stringify({
-          query,
-          vector_weight: parseFloat(vectorWeight),
-          keyword_weight: parseFloat(keywordWeight),
-          graph_weight: parseFloat(graphWeight),
-          top_k: 5,
-          department_filter: departmentFilter || null,
-          use_reranker: useReranker
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        setStreamedAnswer(`Streaming error: ${errData.detail || 'Failed to initialize stream.'}`);
-        setIsStreaming(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = '';
-
+      if (!r.ok) { const d = await r.json().catch(() => ({})); setStreamText(`Error: ${d.detail || 'Failed'}`); return; }
+      const reader = r.body.getReader(); const dec = new TextDecoder(); let acc = '';
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const payload = JSON.parse(line.slice(6));
-              if (payload.type === 'metadata') setStreamMeta(payload);
-              else if (payload.type === 'token') {
-                accumulated += payload.text;
-                setStreamedAnswer(accumulated);
-              } else if (payload.type === 'done') {
-                setStreamMeta(prev => ({ ...prev, ...payload }));
-              }
-            } catch {}
-          }
+        const { done, value } = await reader.read(); if (done) break;
+        for (const line of dec.decode(value).split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const p = JSON.parse(line.slice(6));
+            if (p.type === 'token') { acc += p.text; setStreamText(acc); }
+            if (p.type === 'done') setStreamDone(p);
+          } catch { }
         }
       }
-      fetchLedger();
-      fetchHistory();
-    } catch (err) {
-      setStreamedAnswer(`Streaming error: ${err.message}`);
-    } finally { setIsStreaming(false); }
+      refresh();
+    } catch (err) { setStreamText(`Error: ${err.message}`); }
+    finally { setStreaming(false); }
   };
 
-  // Vis-Network Canvas
-  useEffect(() => {
-    if (activeTab === 'graph' && visJsRef.current && graphData && graphData.nodes && graphData.nodes.length > 0) {
-      const nodes = graphData.nodes.map(n => ({
-        id: n.id, label: n.label, group: n.type,
-        title: `Type: ${n.type} | PageRank: ${n.pagerank}`
-      }));
-      const edges = (graphData.edges || []).map(e => ({
-        from: e.from, to: e.to, label: e.label, arrows: 'to',
-        font: { align: 'middle', size: 11, color: '#e2e8f0' }
-      }));
-      const options = {
-        nodes: { shape: 'dot', size: 22, font: { size: 14, color: '#f8fafc', face: 'Inter' }, borderWidth: 2, shadow: true },
-        groups: {
-          ORGANIZATION: { color: { background: '#2563eb', border: '#60a5fa' } },
-          TECHNOLOGY: { color: { background: '#7c3aed', border: '#a78bfa' } },
-          CONCEPT: { color: { background: '#059669', border: '#34d399' } },
-          METRIC: { color: { background: '#d97706', border: '#fbbf24' } },
-          PERSON: { color: { background: '#db2777', border: '#f472b6' } },
-          LOCATION: { color: { background: '#0891b2', border: '#22d3ee' } },
-          ENTITY: { color: { background: '#475569', border: '#94a3b8' } }
-        },
-        edges: { color: { color: '#64748b', highlight: '#3b82f6' }, width: 2, smooth: { type: 'continuous' } },
-        physics: {
-          forceAtlas2Based: { gravitationalConstant: -32, centralGravity: 0.005, springLength: 220, springConstant: 0.18 },
-          maxVelocity: 140, solver: 'forceAtlas2Based', timestep: 0.35, stabilization: { iterations: 150 }
-        }
-      };
-      const network = new VisNetwork(visJsRef.current, { nodes, edges }, options);
-      network.on('click', (params) => {
-        if (params.nodes.length > 0) {
-          setSelectedNode(graphData.nodes.find(n => n.id === params.nodes[0]));
-        } else setSelectedNode(null);
-      });
-    }
-  }, [activeTab, graphData]);
+  const doUpload = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setUploading(true); setIngLogs([]); setIngDone(false); setIngDocId(null);
+    const form = new FormData(); form.append('file', file); form.append('department', dept || '');
+    const r = await api.upload('/api/upload', form);
+    if (r.ok && r.data?.document_id) setIngDocId(r.data.document_id);
+    else alert(r.data?.detail || 'Upload failed');
+    setUploading(false); e.target.value = '';
+  };
 
-  if (!user) return <AuthPage onLogin={(data) => setUser(data)} />;
+  /* nav config */
+  const NAV = [
+    { key: 'rag',          icon: Search,      label: 'RAG Studio',          badge: null },
+    { key: 'graph',        icon: Network,     label: 'Knowledge Graph',     badge: health?.knowledge_graph?.total_nodes || null },
+    { key: 'documents',    icon: FileText,    label: 'Document Library',    badge: docs.length || null },
+    { key: 'verification', icon: ShieldCheck, label: 'AI Verifier',         badge: null },
+    { key: 'blockchain',   icon: Lock,        label: 'Blockchain Ledger',   badge: health?.blockchain_height ? `#${health.blockchain_height}` : null },
+    { key: 'telemetry',    icon: Terminal,    label: 'Component Telemetry', badge: null },
+    { key: 'history',      icon: Clock,       label: 'Chat History',        badge: history.length || null },
+  ];
 
-  const trustColor = (score) => score >= 80 ? 'text-emerald-400' : score >= 60 ? 'text-amber-400' : 'text-rose-400';
-  const riskBg = (risk) => risk === 'LOW' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : risk === 'MEDIUM' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40';
-
+  /* ============================================================ */
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
+    <div className="app-layout">
 
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-50 shadow-md">
-        <div className="flex items-center space-x-3.5">
-          <div className="p-2.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-xl shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
-            <Network className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white flex items-center space-x-2">
-              <span>Enterprise Hybrid Graph-RAG</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">v2.0</span>
-            </h1>
-            <p className="text-xs text-slate-400 font-mono">Qdrant Vector · NetworkX Graph · BM25 Keyword · Gemini 2.0 AI</p>
+      {/* ── TOPBAR ────────────────────────────────────────────── */}
+      <header className="topbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => setSidebar(p => !p)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.45)', padding: 6, borderRadius: 7, display: 'flex', transition: 'color 0.15s' }}>
+            {sidebar ? <X size={17} /> : <Menu size={17} />}
+          </button>
+          <div className="topbar-logo">
+            <div className="logo-icon"><Network size={17} color="#fff" /></div>
+            <div>
+              <div className="topbar-title">Graph-RAG</div>
+              <div className="topbar-sub">Enterprise Intelligence Platform</div>
+            </div>
           </div>
         </div>
 
-        {/* System Stats Bar */}
-        <div className="hidden lg:flex items-center space-x-3">
-          <div className="px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center space-x-2 text-xs shadow-inner">
-            <Database className="w-4 h-4 text-blue-400" />
-            <span className="text-slate-400 font-medium">Vectors:</span>
-            <span className="font-bold text-blue-300 font-mono">{health?.vector_store_chunks || 0}</span>
-          </div>
-          <div className="px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center space-x-2 text-xs shadow-inner">
-            <Network className="w-4 h-4 text-emerald-400" />
-            <span className="text-slate-400 font-medium">Graph:</span>
-            <span className="font-bold text-emerald-300 font-mono">{health?.knowledge_graph?.total_nodes || 0} nodes</span>
-          </div>
-          <div className="px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center space-x-2 text-xs shadow-inner">
-            <Lock className="w-4 h-4 text-purple-400" />
-            <span className="text-slate-400 font-medium">Blocks:</span>
-            <span className="font-bold text-purple-300 font-mono">#{health?.blockchain_height || 1}</span>
-          </div>
-          <button onClick={seedDemoData} disabled={loading} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-md shadow-blue-500/20">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Seed Demo Data</span>
+        {/* Centre Stats */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { i: Database, v: health?.vector_store_chunks || 0, l: 'vectors',     c: '#818cf8' },
+            { i: Network,  v: health?.knowledge_graph?.total_nodes || 0, l: 'nodes', c: '#34d399' },
+            { i: Lock,     v: `#${health?.blockchain_height || 1}`, l: 'blocks',  c: '#a78bfa' },
+          ].map(({ i: I, v, l, c }) => (
+            <div key={l} className="stat-pill">
+              <I size={12} color={c} />
+              <span className="stat-pill-val">{v}</span>
+              <span>{l}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={seed} disabled={seeding} className="btn btn-primary" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8 }}>
+            {seeding ? <Spinner size={12} /> : <Sparkles size={12} />}
+            Seed Demo Data
           </button>
-          
-          <div className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl">
-            <User className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold text-slate-200">{user.username}</span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded font-mono font-bold uppercase">{user.role}</span>
-            <button onClick={handleLogout} title="Sign Out" className="text-slate-400 hover:text-rose-400 transition ml-1.5">
-              <LogOut className="w-3.5 h-3.5" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 14px 6px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={13} color="#fff" />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{user.username}</div>
+              <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{user.role}</div>
+            </div>
+            <button onClick={() => { api.clear(); setUser(null); }} className="btn btn-danger" style={{ padding: '5px 8px', borderRadius: 7, marginLeft: 4, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
+              <LogOut size={13} />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Workspace */}
-      <div className="flex-1 flex flex-col md:flex-row">
+      {/* ── BODY ─────────────────────────────────────────────── */}
+      <div className="app-body">
 
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 border-r border-slate-800/80 bg-slate-900/70 p-4 space-y-2 flex-shrink-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">Workspace Menu</div>
-          {[
-            { key: 'chat', icon: Search, label: 'RAG Studio' },
-            { key: 'graph', icon: Network, label: 'Knowledge Graph' },
-            { key: 'ingestion', icon: Upload, label: 'Documents Library' },
-            { key: 'verification', icon: ShieldCheck, label: 'Multi-Agent Verifier' },
-            { key: 'blockchain', icon: Lock, label: 'Blockchain Ledger' },
-            { key: 'telemetry', icon: Terminal, label: 'Component Telemetry & Logs' },
-            { key: 'history', icon: Clock, label: 'Chat History' },
-          ].map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all ${activeTab === key ? `bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 ring-1 ring-white/20` : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'}`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{label}</span>
-            </button>
-          ))}
+        {/* SIDEBAR */}
+        <aside className={`sidebar ${sidebar ? '' : 'collapsed'}`}>
+          <div className="sidebar-inner">
+            <div className="nav-section-label">Workspace</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {NAV.map(({ key, icon: Icon, label, badge }) => (
+                <button key={key} onClick={() => setTab(key)} className={`nav-item ${tab === key ? 'active' : ''}`}>
+                  <Icon size={15} />
+                  <span style={{ flex: 1 }}>{label}</span>
+                  {badge && <span className="nav-badge">{badge}</span>}
+                </button>
+              ))}
+            </nav>
 
-          {/* Quick Ingestion */}
-          <div className="pt-6">
-            <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 space-y-3 shadow-md">
-              <div className="flex items-center space-x-2 text-xs font-bold text-slate-200">
-                <FileText className="w-4 h-4 text-blue-400" />
-                <span>Upload Document</span>
-              </div>
-              <input
-                type="text"
-                placeholder="Department Tag (optional)"
-                value={departmentFilter}
-                onChange={e => setDepartmentFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            <div className="sidebar-divider" style={{ marginTop: 'auto' }} />
+            <div className="nav-section-label">Quick Upload</div>
+            <div className="upload-widget">
+              <input type="text" value={dept} onChange={e => setDept(e.target.value)}
+                placeholder="Department tag (optional)"
+                style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8, color: 'rgba(255,255,255,0.7)', fontSize: 11.5, outline: 'none', marginBottom: 8, fontFamily: 'var(--font-sans)' }}
               />
-              <label className="block w-full text-center px-3 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 rounded-lg text-xs font-bold text-blue-300 cursor-pointer transition">
-                {uploading ? 'Processing File...' : 'Select PDF / DOCX / TXT'}
-                <input type="file" onChange={handleFileUpload} disabled={uploading} className="hidden" accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 8, background: 'rgba(99,102,241,0.14)', border: '1px dashed rgba(129,140,248,0.40)', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: 11.5, fontWeight: 600, color: '#a5b4fc', transition: 'all 0.18s' }}>
+                <Upload size={12} />
+                {uploading ? 'Processing…' : 'Select & Upload File'}
+                <input type="file" onChange={doUpload} disabled={uploading} style={{ display: 'none' }} accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
               </label>
             </div>
           </div>
         </aside>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 bg-slate-950 overflow-y-auto">
+        {/* MAIN */}
+        <main className="main-content">
 
-          {/* TAB 1: RAG STUDIO */}
-          {activeTab === 'chat' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
+          {/* ======================================================
+              RAG STUDIO
+              ====================================================== */}
+          {tab === 'rag' && (
+            <div style={{ maxWidth: 860, margin: '0 auto' }}>
+              <PageHeader icon={Search} title="RAG Studio" sub="Hybrid Vector · BM25 Keyword · Knowledge Graph retrieval with Gemini 2.0 AI" />
 
-              {/* Guide Banner */}
-              {showGuide && (
-                <div className="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-500/30 rounded-2xl p-5 relative shadow-lg">
-                  <button onClick={() => setShowGuide(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 text-xs font-bold font-mono">✕ Dismiss Guide</button>
-                  <div className="flex items-start space-x-3.5">
-                    <div className="p-2.5 bg-blue-500/20 rounded-xl border border-blue-500/30 flex-shrink-0">
-                      <Info className="w-5 h-5 text-blue-400" />
-                    </div>
-                    <div className="space-y-1.5 text-xs text-slate-200">
-                      <h3 className="text-sm font-bold text-white">How Enterprise Graph-RAG Works</h3>
-                      <p className="leading-relaxed">
-                        1. <strong>Upload Documents</strong> or click <span className="text-blue-400 font-bold">"Seed Demo Data"</span> at top right to populate HR & Architecture policies.<br />
-                        2. <strong>Adjust Sliders</strong> below to weight Vector Similarity, Keyword Searching, and Knowledge Graph Context.<br />
-                        3. Type a question and click <span className="text-indigo-400 font-bold">"Stream AI"</span> for real-time token generation or <span className="text-slate-300 font-bold">"Instant"</span> for structured multi-agent answers.
-                      </p>
-                    </div>
+              {/* Retrieval Sliders */}
+              <div className="card card-p" style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <Sliders size={14} color="#6366f1" />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Hybrid Retrieval Weights</span>
+                    <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>RRF Fusion</span>
                   </div>
-                </div>
-              )}
-
-              {/* Retrieval Weight Controls */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Sliders className="w-4 h-4 text-blue-400" />
-                    <h2 className="text-sm font-bold text-slate-200">Hybrid Retrieval Weights (RRF Fusion)</h2>
-                  </div>
-                  <label className="flex items-center space-x-2 text-xs text-slate-300 font-semibold cursor-pointer">
-                    <input type="checkbox" checked={useReranker} onChange={e => setUseReranker(e.target.checked)} className="w-4 h-4 accent-blue-500 rounded" />
-                    <span>Neural Cross-Encoder Re-ranker</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#6b7280', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={reranker} onChange={e => setReranker(e.target.checked)} />
+                    Neural Re-Ranker
                   </label>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
                   {[
-                    { label: 'Vector Similarity (Qdrant)', value: vectorWeight, set: setVectorWeight, color: 'text-blue-400' },
-                    { label: 'BM25 Keyword Matching', value: keywordWeight, set: setKeywordWeight, color: 'text-purple-400' },
-                    { label: 'Knowledge Graph Weight', value: graphWeight, set: setGraphWeight, color: 'text-emerald-400' }
-                  ].map(({ label, value, set, color }) => (
-                    <div key={label} className="space-y-2 bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/80">
-                      <div className="flex justify-between text-xs font-bold text-slate-200">
-                        <span>{label}</span>
-                        <span className={`font-mono text-sm ${color}`}>{value}</span>
+                    { k: 'vector', l: 'Vector Similarity', sub: 'Qdrant · all-MiniLM-L6-v2', col: '#6366f1' },
+                    { k: 'keyword', l: 'BM25 Keyword', sub: 'Custom BM25 · TF-IDF', col: '#8b5cf6' },
+                    { k: 'graph', l: 'Knowledge Graph', sub: 'NetworkX · PageRank', col: '#10b981' },
+                  ].map(({ k, l, sub, col }) => (
+                    <div key={k} style={{ background: '#f8f9ff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a1d2e' }}>{l}</div>
+                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{sub}</div>
+                        </div>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{weights[k]}</span>
                       </div>
-                      <input type="range" min="0" max="1" step="0.1" value={value}
-                        onChange={e => set(e.target.value)}
-                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+                      <input type="range" min="0" max="1" step="0.1" value={weights[k]}
+                        onChange={e => setWeights(p => ({ ...p, [k]: e.target.value }))} />
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Search Form */}
-              <form onSubmit={handleQuerySubmit} className="relative">
-                <input
-                  type="text"
-                  placeholder="Ask a question (e.g. 'How many casual leaves do employees get?' or 'What technology stack is used?')"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  className="w-full pl-5 pr-56 py-4.5 bg-slate-900 border border-slate-700/90 rounded-2xl text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xl transition"
+              {/* Search Bar */}
+              <form onSubmit={runQuery} style={{ position: 'relative', marginBottom: 22 }}>
+                <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                  placeholder="Ask anything — 'How many casual leaves do employees get?' or 'What is our AI tech stack?'"
+                  className="input search-input"
+                  style={{ paddingRight: 190 }}
                 />
-                <div className="absolute right-3 top-3 bottom-3 flex items-center space-x-2">
-                  <button type="submit" disabled={loading}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-100 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition">
-                    {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                    <span>Instant</span>
+                <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 6 }}>
+                  <button type="submit" disabled={querying} className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: 12.5 }}>
+                    {querying ? <Spinner size={13} /> : <Search size={13} />} Instant
                   </button>
-                  <button type="button" onClick={handleStreamQuery} disabled={isStreaming}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 transition shadow-md shadow-blue-500/25">
-                    {isStreaming ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                    <span>Stream AI</span>
+                  <button type="button" onClick={runStream} disabled={streaming} className="btn btn-primary" style={{ padding: '8px 14px', fontSize: 12.5 }}>
+                    {streaming ? <Spinner size={13} /> : <Send size={13} />} Stream AI
                   </button>
                 </div>
               </form>
 
-              {/* Streaming Box */}
-              {(isStreaming || streamedAnswer) && (
-                <div className="bg-slate-900/95 border border-blue-500/40 rounded-2xl p-6 space-y-4 shadow-2xl">
-                  <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
-                    <Activity className={`w-4 h-4 ${isStreaming ? 'text-blue-400 animate-pulse' : 'text-emerald-400'}`} />
-                    <span className="text-sm font-bold text-slate-100">
-                      {isStreaming ? 'Gemini AI Live Token Stream…' : 'Live Stream Finished'}
+              {/* Stream Output */}
+              {(streaming || streamText) && (
+                <div className="card card-accent slide-up" style={{ padding: 24, marginBottom: 20, borderColor: streaming ? 'rgba(99,102,241,0.35)' : 'rgba(16,185,129,0.30)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--border-light)' }}>
+                    <Activity size={14} color={streaming ? '#6366f1' : '#10b981'} className={streaming ? 'pulse' : ''} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1d2e' }}>
+                      {streaming ? 'Streaming from Gemini 2.0 Flash…' : 'Stream Complete'}
                     </span>
+                    {streamDone && <RiskBadge risk={streamDone.hallucination_risk} />}
                   </div>
-                  <p className="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap font-sans">{streamedAnswer}</p>
+                  <p className={streaming ? 'cursor-blink' : ''} style={{ margin: 0, fontSize: 14, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap' }}>
+                    {streamText}
+                  </p>
+                  {streamDone && (
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border-light)', display: 'flex', gap: 16, alignItems: 'center' }}>
+                      <TrustRing score={streamDone.trust_score} />
+                      <div style={{ fontSize: 12, color: '#6b7280', fontFamily: 'var(--font-mono)', lineHeight: 2 }}>
+                        <div>Trust: <strong style={{ color: '#6366f1' }}>{streamDone.trust_score}%</strong></div>
+                        <div>Verdict: <strong style={{ color: '#374151' }}>{streamDone.agent_verdict}</strong></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Instant Search Response */}
-              {queryResponse && (
-                <div className="space-y-6">
-                  <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-emerald-500/15 rounded-xl border border-emerald-500/30">
-                          <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              {/* Instant Response */}
+              {queryRes && (
+                <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  {/* Answer */}
+                  <div className="card" style={{ padding: 26, border: '1px solid rgba(16,185,129,0.22)', boxShadow: '0 4px 16px rgba(16,185,129,0.08)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16 }}>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <div style={{ padding: 10, borderRadius: 12, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.20)', flexShrink: 0 }}>
+                          <CheckCircle2 size={18} color="#10b981" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-100 text-base">Verified Knowledge Answer</h3>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">
-                            Latency: {queryResponse.latency_ms}ms · Block #{queryResponse.blockchain_seal?.block_index || 1}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-right">
-                          <div className={`text-2xl font-extrabold font-mono ${trustColor(queryResponse.trust_score)}`}>
-                            {queryResponse.trust_score}%
+                          <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#1a1d2e' }}>Verified Knowledge Answer</h3>
+                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                            <span className="badge badge-slate" style={{ fontSize: 10 }}>⚡ {queryRes.latency_ms}ms</span>
+                            <RiskBadge risk={queryRes.hallucination_risk} />
                           </div>
-                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Trust Score</div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${riskBg(queryResponse.hallucination_risk)}`}>
-                          {queryResponse.hallucination_risk} RISK
-                        </span>
                       </div>
+                      <TrustRing score={queryRes.trust_score} />
                     </div>
-                    <p className="text-slate-100 leading-relaxed text-sm whitespace-pre-wrap">{queryResponse.answer}</p>
+                    <p style={{ margin: '0 0 20px', fontSize: 14, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap' }}>{queryRes.answer}</p>
+                    {/* Blockchain Seal */}
+                    <div style={{ padding: '12px 16px', background: '#f5f3ff', border: '1px solid rgba(139,92,246,0.20)', borderRadius: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Lock size={11} color="#7c3aed" />
+                        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Blockchain Seal · Block #{queryRes.blockchain_seal?.block_index}</span>
+                      </div>
+                      <div className="hash-code" style={{ color: '#6366f1' }}>{queryRes.blockchain_seal?.block_hash}</div>
+                    </div>
                   </div>
 
-                  {/* Sources */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Retrieved Source Evidence ({queryResponse.retrieved_chunks?.length || 0} chunks)
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {(queryResponse.retrieved_chunks || []).map((chunk, idx) => (
-                        <div key={idx} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-md">
-                          <div className="flex items-center justify-between text-xs font-mono">
-                            <span className="font-bold text-blue-400 truncate max-w-[200px]">{chunk.filename} (p.{chunk.page_num})</span>
-                            <span className="px-2 py-0.5 bg-blue-500/15 text-blue-300 rounded font-bold">RRF: {chunk.hybrid_score?.toFixed(4)}</span>
+                  {/* Source Chunks */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 10 }}>
+                      Retrieved Evidence Chunks ({queryRes.retrieved_chunks?.length || 0})
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
+                      {(queryRes.retrieved_chunks || []).map((c, i) => (
+                        <div key={i} className="card card-p" style={{ padding: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#4f46e5', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 170 }}>{c.filename}</span>
+                            <span style={{ fontSize: 10, color: '#9ca3af', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>p.{c.page_num}</span>
                           </div>
-                          <p className="text-xs text-slate-200 line-clamp-3 leading-relaxed">{chunk.content}</p>
+                          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#6b7280', lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.content}</p>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <span className="badge badge-indigo" style={{ fontSize: 9 }}>RRF {c.hybrid_score?.toFixed(4)}</span>
+                            {c.department && <span className="badge badge-blue" style={{ fontSize: 9 }}>{c.department}</span>}
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* Empty State */}
+              {!queryRes && !streamText && !streaming && !querying && (
+                <EmptyState icon={Sparkles} message={<>Ask a question above, or click <strong style={{ color: '#6366f1' }}>Seed Demo Data</strong> in the top bar to populate sample HR and Technology documents for instant testing.</>} />
+              )}
             </div>
           )}
 
-          {/* TAB 2: KNOWLEDGE GRAPH */}
-          {activeTab === 'graph' && (
-            <div className="h-full flex flex-col space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-100">Interactive Knowledge Graph</h2>
-                  <p className="text-xs text-slate-400">Entities and semantic relationships extracted automatically from documents.</p>
+          {/* ======================================================
+              KNOWLEDGE GRAPH
+              ====================================================== */}
+          {tab === 'graph' && (
+            <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+              <PageHeader icon={Network} color="#10b981" title="Knowledge Graph Explorer"
+                sub={`${health?.knowledge_graph?.total_nodes || 0} entities · ${health?.knowledge_graph?.total_edges || 0} semantic relationships`} />
+              <div style={{ display: 'flex', gap: 18, minHeight: 580 }}>
+                <div className="graph-wrap" ref={visRef} style={{ flex: 1 }} />
+                <div className="card card-p" style={{ width: 228, flexShrink: 0, padding: 18 }}>
+                  {selNode ? (
+                    <div className="scale-in">
+                      <span className={`badge ${({ TECHNOLOGY: 'badge-purple', ORGANIZATION: 'badge-blue', CONCEPT: 'badge-green', METRIC: 'badge-amber', PERSON: 'badge-red', LOCATION: 'badge-blue' }[selNode.type] || 'badge-slate')}`}>{selNode.type}</span>
+                      <h3 style={{ fontSize: 15, fontWeight: 800, color: '#1a1d2e', margin: '10px 0 14px', wordBreak: 'break-word' }}>{selNode.label}</h3>
+                      <div className="divider" style={{ marginBottom: 14 }} />
+                      {[['PageRank', selNode.pagerank, '#6366f1'], ['Degree', selNode.degree_centrality, '#10b981'], ['Frequency', selNode.frequency, '#f59e0b']].map(([k, v, c]) => (
+                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-light)', fontSize: 12.5 }}>
+                          <span style={{ color: '#9ca3af' }}>{k}</span>
+                          <span style={{ color: c, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{v}</span>
+                        </div>
+                      ))}
+                      <button onClick={() => setSelNode(null)} className="btn btn-ghost" style={{ width: '100%', marginTop: 14, fontSize: 12 }}>
+                        <X size={12} /> Deselect
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 14 }}>Entity Types</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                        {[['ORGANIZATION','#3b82f6','🏢'],['TECHNOLOGY','#7c3aed','⚡'],['CONCEPT','#10b981','💡'],['METRIC','#f59e0b','📊'],['PERSON','#ec4899','👤'],['LOCATION','#0891b2','📍']].map(([t, c, em]) => (
+                          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 7, height: 7, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                            <span style={{ fontSize: 11.5, color: '#6b7280', fontWeight: 500 }}>{em} {t}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="divider" style={{ margin: '14px 0' }} />
+                      <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0, lineHeight: 1.6 }}>Click any node to inspect its metrics.</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="flex-1 flex gap-4 min-h-[550px]">
-                <div ref={visJsRef} className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl" />
-                {selectedNode && (
-                  <div className="w-72 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 flex-shrink-0">
-                    <div className="border-b border-slate-800 pb-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 font-mono">{selectedNode.type}</span>
-                      <h3 className="text-base font-bold text-slate-100 mt-0.5">{selectedNode.label}</h3>
-                    </div>
-                    <div className="space-y-2 text-xs font-mono">
-                      <div className="flex justify-between py-1.5 border-b border-slate-800">
-                        <span className="text-slate-400">PageRank:</span>
-                        <span className="text-emerald-400 font-bold">{selectedNode.pagerank}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-slate-800">
-                        <span className="text-slate-400">Degree:</span>
-                        <span className="text-blue-400 font-bold">{selectedNode.degree_centrality}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5">
-                        <span className="text-slate-400">Frequency:</span>
-                        <span className="text-amber-400 font-bold">{selectedNode.frequency}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
-          {/* TAB 3: DOCUMENTS LIBRARY */}
-          {activeTab === 'ingestion' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="bg-slate-900/90 border border-dashed border-slate-700 rounded-2xl p-8 text-center space-y-4 shadow-xl">
-                <div className="w-14 h-14 bg-blue-500/15 rounded-2xl flex items-center justify-center mx-auto ring-1 ring-blue-500/30">
-                  <Upload className="w-7 h-7 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-100">Upload Enterprise Documents</h3>
-                  <p className="text-xs text-slate-400 mt-1">Parses PDF, Word (.docx), Excel (.xlsx), Text, and Markdown</p>
-                </div>
-                <label className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition shadow-lg shadow-blue-500/25">
-                  {uploading ? 'Uploading Document...' : 'Select File to Ingest'}
-                  <input type="file" onChange={handleFileUpload} disabled={uploading} className="hidden" accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
-                </label>
-              </div>
+          {/* ======================================================
+              DOCUMENT LIBRARY
+              ====================================================== */}
+          {tab === 'documents' && (
+            <div style={{ maxWidth: 820, margin: '0 auto' }}>
+              <PageHeader icon={FileText} color="#3b82f6" title="Document Library" sub="Upload and manage enterprise knowledge sources" />
 
-              {/* LIVE INGESTION LOG TERMINAL */}
-              {ingestionLogs.length > 0 && (
-                <div className="bg-slate-950 border border-blue-500/40 rounded-2xl p-5 space-y-3 font-mono shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${ingestionComplete ? 'bg-emerald-400' : 'bg-blue-400 animate-ping'}`} />
-                      <span className="text-xs font-bold text-slate-200">
-                        {ingestionComplete ? 'INGESTION COMPLETE ✓' : 'LIVE STEP-BY-STEP INGESTION PROCESS'}
-                      </span>
-                    </div>
+              <label className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '44px 24px', cursor: uploading ? 'not-allowed' : 'pointer', marginBottom: 22, borderStyle: 'dashed', borderColor: 'rgba(99,102,241,0.28)', textAlign: 'center', transition: 'all 0.2s' }}>
+                <div style={{ padding: 16, borderRadius: 16, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', marginBottom: 14 }}>
+                  <Upload size={26} color="#6366f1" />
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1d2e', marginBottom: 5 }}>
+                  {uploading ? 'Uploading document…' : 'Drop file or click to upload'}
+                </div>
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>PDF · DOCX · XLSX · TXT · Markdown</div>
+                <input type="file" onChange={doUpload} disabled={uploading} style={{ display: 'none' }} accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
+              </label>
+
+              {/* Ingestion Terminal */}
+              {ingLogs.length > 0 && (
+                <div className="terminal slide-up" style={{ marginBottom: 22 }}>
+                  <div className="terminal-header">
+                    <div className="terminal-dot" style={{ background: ingDone ? '#10b981' : '#f59e0b' }} />
+                    <div className="terminal-dot" style={{ background: '#374151' }} />
+                    <div className="terminal-dot" style={{ background: '#374151' }} />
+                    <span style={{ marginLeft: 4, fontSize: 11.5, fontWeight: 700, color: ingDone ? '#6ee7b7' : '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      {ingDone ? '✓ Ingestion Complete' : '⟳ Live Ingestion Pipeline'}
+                    </span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: '#4b5563' }}>{ingDocId?.slice(0, 8)}…</span>
                   </div>
-                  <div className="space-y-2 text-xs max-h-64 overflow-y-auto">
-                    {ingestionLogs.map((log, idx) => (
-                      <div key={idx} className="flex items-start space-x-2">
-                        <span className="text-slate-500 text-[10px] flex-shrink-0 pt-0.5">{log.timestamp?.slice(11, 19)}</span>
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${log.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                          Step {log.step}/{log.total_steps}
+                  <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {ingLogs.map((log, i) => (
+                      <div key={i} className="terminal-line">
+                        <span className="t-time">{log.timestamp?.slice(11, 19)}</span>
+                        <span className={`step-dot ${log.status === 'COMPLETED' ? 'done' : 'active'}`} />
+                        <span className={`t-step ${log.status === 'COMPLETED' ? 'done' : 'active'}`}>
+                          {log.step}/{log.total_steps}
                         </span>
-                        <span className={`leading-relaxed ${log.status === 'COMPLETED' ? 'text-emerald-300 font-semibold' : 'text-slate-300'}`}>
-                          {log.message}
-                        </span>
+                        <span className={`t-msg ${log.status === 'COMPLETED' ? 'done' : ''}`}>{log.message}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* DOCUMENTS LIST */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Indexed Documents ({documents.length})</h4>
-                {documents.length === 0 ? (
-                  <p className="text-xs text-slate-500">No documents indexed yet. Upload a file above or click "Seed Demo Data".</p>
-                ) : documents.map((doc) => (
-                  <div key={doc.document_id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-md">
-                    <div className="flex items-center space-x-3">
-                      <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-bold text-slate-200">{doc.filename}</p>
-                        <p className="text-xs text-slate-400 font-mono mt-0.5">
-                          {doc.chunk_count} chunks · {doc.page_count} pages · {(doc.file_size / 1024).toFixed(1)} KB
-                          {doc.department && <span className="ml-2 text-blue-400 font-bold">[{doc.department}]</span>}
-                        </p>
+              {/* Doc list */}
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 10 }}>
+                Indexed Documents ({docs.length})
+              </div>
+              {docs.length === 0 ? <EmptyState icon={Inbox} message="No documents yet. Upload a file or seed demo data." />
+                : docs.map(doc => (
+                  <div key={doc.document_id} className="card" style={{ padding: '15px 20px', marginBottom: 9, display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: '#eff6ff', border: '1px solid rgba(59,130,246,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <FileText size={17} color="#3b82f6" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1d2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</div>
+                      <div style={{ marginTop: 5, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.chunk_count} chunks</span>
+                        <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.page_count} pages</span>
+                        <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{(doc.file_size / 1024).toFixed(1)} KB</span>
+                        {doc.department && <span className="badge badge-blue" style={{ fontSize: 9.5 }}>{doc.department}</span>}
                       </div>
                     </div>
-                    <span className="text-xs font-mono text-slate-400">{new Date(doc.upload_timestamp).toLocaleDateString()}</span>
+                    <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{new Date(doc.upload_timestamp).toLocaleDateString()}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* ======================================================
+              AI VERIFIER
+              ====================================================== */}
+          {tab === 'verification' && (
+            <div style={{ maxWidth: 820, margin: '0 auto' }}>
+              <PageHeader icon={ShieldCheck} color="#10b981" title="Multi-Agent AI Verifier" sub="Fact-Checker Agent · Citation Auditor · Hallucination Risk Guard" />
+              {queryRes?.multi_agent_report ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+                    {[
+                      { icon: Shield, label: 'Trust Score', value: `${queryRes.multi_agent_report.trust_score}%`, col: '#10b981', bg: '#ecfdf5', border: 'rgba(16,185,129,0.25)' },
+                      { icon: TrendingUp, label: 'Grounding Score', value: `${queryRes.multi_agent_report.grounding_score}%`, col: '#6366f1', bg: '#eff2ff', border: 'rgba(99,102,241,0.22)' },
+                      { icon: AlertTriangle, label: 'Hallucination Risk', value: queryRes.multi_agent_report.hallucination_risk, col: queryRes.multi_agent_report.hallucination_risk === 'LOW' ? '#10b981' : '#f59e0b', bg: '#fffbeb', border: 'rgba(245,158,11,0.22)' },
+                    ].map(({ icon: I, label, value, col, bg, border }) => (
+                      <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 16, padding: 22, textAlign: 'center' }}>
+                        <I size={22} color={col} style={{ margin: '0 auto 10px', display: 'block' }} />
+                        <div style={{ fontSize: 22, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>{value}</div>
+                        <div style={{ fontSize: 11.5, color: '#9ca3af', fontWeight: 600, marginTop: 4 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="card card-p">
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 10 }}>Agent Verdict</div>
+                    <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.75, color: '#374151' }}>{queryRes.multi_agent_report.agent_verdict}</p>
+                  </div>
+                </div>
+              ) : <EmptyState icon={ShieldCheck} message="Ask a question in RAG Studio to run multi-agent verification analysis." />}
+            </div>
+          )}
+
+          {/* ======================================================
+              BLOCKCHAIN LEDGER
+              ====================================================== */}
+          {tab === 'blockchain' && (
+            <div style={{ maxWidth: 820, margin: '0 auto' }}>
+              <PageHeader icon={Lock} color="#7c3aed" title="Blockchain Audit Ledger" sub="SHA-256 Merkle-tree immutable tamper-proof audit trail"
+                action={<span className={`badge ${ledger?.chain_integrity?.valid ? 'badge-green' : 'badge-red'}`}>
+                  {ledger?.chain_integrity?.valid ? '✓ Chain Valid' : '✗ Tampered'}
+                </span>} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[...(ledger.blocks || [])].reverse().map((block, i) => (
+                  <div key={block.index} className="card card-p">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f5f3ff', border: '1px solid rgba(139,92,246,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Lock size={15} color="#7c3aed" />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1a1d2e' }}>Block #{block.index}</span>
+                          {i === 0 && <span className="badge badge-purple" style={{ fontSize: 9 }}>Latest</span>}
+                          {block.index === 0 && <span className="badge badge-amber" style={{ fontSize: 9 }}>Genesis</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{block.timestamp}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginBottom: 4 }}>Block Hash</div>
+                    <div className="hash-code" style={{ color: '#6366f1' }}>{block.hash}</div>
+                    {block.merkle_root && <>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginTop: 12, marginBottom: 4 }}>Merkle Root</div>
+                      <div className="hash-code" style={{ color: '#10b981' }}>{block.merkle_root}</div>
+                    </>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* TAB 4: MULTI-AGENT VERIFIER */}
-          {activeTab === 'verification' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-xl">
-                <div className="flex items-center space-x-3">
-                  <ShieldCheck className="w-6 h-6 text-amber-400" />
-                  <div>
-                    <h3 className="text-base font-bold text-slate-100">Multi-Agent Verification Pipeline</h3>
-                    <p className="text-xs text-slate-400">Fact-Checker Agent · Citation Auditor · Hallucination Guard</p>
-                  </div>
-                </div>
-                {queryResponse?.multi_agent_report ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                        <div className={`text-2xl font-extrabold font-mono ${trustColor(queryResponse.multi_agent_report.trust_score)}`}>
-                          {queryResponse.multi_agent_report.trust_score}%
-                        </div>
-                        <div className="text-xs text-slate-300 mt-1 font-semibold">Trust Score</div>
-                      </div>
-                      <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                        <div className="text-2xl font-extrabold font-mono text-blue-400">
-                          {queryResponse.multi_agent_report.grounding_score}%
-                        </div>
-                        <div className="text-xs text-slate-300 mt-1 font-semibold">Grounding Score</div>
-                      </div>
-                      <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                        <div className="text-xl font-bold font-mono text-emerald-400">
-                          {queryResponse.multi_agent_report.hallucination_risk}
-                        </div>
-                        <div className="text-xs text-slate-300 mt-1 font-semibold">Hallucination Risk</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400">Ask a question in RAG Studio to run multi-agent verification analysis.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: BLOCKCHAIN LEDGER */}
-          {activeTab === 'blockchain' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <div className="flex items-center space-x-3">
-                    <Lock className="w-6 h-6 text-purple-400" />
-                    <div>
-                      <h3 className="text-base font-bold text-slate-100">SHA-256 Merkle Audit Ledger</h3>
-                      <p className="text-xs text-slate-400 font-mono">Immutable audit history for all document ingestions and query executions</p>
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
-                    Chain Valid ✓
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {(ledgerData.blocks || []).slice().reverse().map((block) => (
-                    <div key={block.index} className="bg-slate-800/80 border border-slate-700 rounded-xl p-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="font-bold text-purple-400">Block #{block.index}</span>
-                        <span className="text-slate-400">{block.timestamp}</span>
-                      </div>
-                      <p className="text-xs font-mono text-slate-200">Hash: {block.hash}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 6: NEW COMPONENT TELEMETRY & LIVE LOGS */}
-          {activeTab === 'telemetry' && (
-            <div className="max-w-5xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-100">Under-the-Hood Component Telemetry</h2>
-                  <p className="text-xs text-slate-400">Live operational metrics and logs for Vector Store, Graph Engine, Blockchain, and BM25.</p>
-                </div>
-                <button onClick={fetchTelemetry} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 rounded-lg flex items-center space-x-1.5 transition">
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Refresh Telemetry</span>
-                </button>
-              </div>
-
+          {/* ======================================================
+              COMPONENT TELEMETRY
+              ====================================================== */}
+          {tab === 'telemetry' && (
+            <div style={{ maxWidth: 980, margin: '0 auto' }}>
+              <PageHeader icon={Terminal} color="#6366f1" title="Component Telemetry & Live Logs" sub="Real-time metrics for all platform subsystems"
+                action={<button onClick={async () => { const d = await api.get('/api/system/telemetry'); if (d?.qdrant_vector_store) setTelemetry(d); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}><RefreshCw size={13} /> Refresh</button>} />
               {telemetry ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Qdrant Vector Store */}
-                  <div className="bg-slate-900 border border-blue-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div className="flex items-center space-x-2">
-                        <Database className="w-5 h-5 text-blue-400" />
-                        <h3 className="font-bold text-slate-100 text-sm">Qdrant Vector Database</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(400px,1fr))', gap: 18 }}>
+                  {/* Qdrant */}
+                  <div className="telemetry-card" style={{ borderTop: '3px solid #6366f1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ padding: 9, borderRadius: 11, background: '#eff2ff', border: '1px solid rgba(99,102,241,0.22)' }}>
+                          <Database size={16} color="#6366f1" />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Qdrant Vector Store</div>
+                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>all-MiniLM-L6-v2 · {telemetry.qdrant_vector_store?.vector_dimension}D Cosine</div>
+                        </div>
                       </div>
-                      <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/20 text-blue-300 rounded font-mono">OPERATIONAL</span>
+                      <span className="badge badge-indigo">Operational</span>
                     </div>
-                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
-                      <p><span className="text-slate-500">Storage Mode:</span> {telemetry.qdrant_vector_store?.storage_mode}</p>
-                      <p><span className="text-slate-500">Path:</span> {telemetry.qdrant_vector_store?.path}</p>
-                      <p><span className="text-slate-500">Dimension:</span> {telemetry.qdrant_vector_store?.vector_dimension}D ({telemetry.qdrant_vector_store?.distance_metric})</p>
-                      <p><span className="text-slate-500">Indexed Chunks:</span> <strong className="text-blue-400">{telemetry.qdrant_vector_store?.indexed_chunks}</strong></p>
+                    {[['Storage Mode', telemetry.qdrant_vector_store?.storage_mode], ['Collection', 'enterprise_chunks'], ['Indexed Chunks', telemetry.qdrant_vector_store?.indexed_chunks], ['Distance Metric', telemetry.qdrant_vector_store?.distance_metric]].map(([k, v]) => (
+                      <div key={k} className="telemetry-row">
+                        <span className="telemetry-key">{k}</span>
+                        <span className="telemetry-val" style={{ color: '#6366f1' }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* KG */}
+                  <div className="telemetry-card" style={{ borderTop: '3px solid #10b981' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ padding: 9, borderRadius: 11, background: '#ecfdf5', border: '1px solid rgba(16,185,129,0.22)' }}>
+                          <Network size={16} color="#10b981" />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Knowledge Graph</div>
+                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>NetworkX · JSON Persistence</div>
+                        </div>
+                      </div>
+                      <span className="badge badge-green">Active</span>
+                    </div>
+                    {[['Total Nodes', telemetry.knowledge_graph?.total_nodes], ['Total Edges', telemetry.knowledge_graph?.total_edges], ['Graph Density', telemetry.knowledge_graph?.graph_density]].map(([k, v]) => (
+                      <div key={k} className="telemetry-row">
+                        <span className="telemetry-key">{k}</span>
+                        <span className="telemetry-val" style={{ color: '#10b981' }}>{v}</span>
+                      </div>
+                    ))}
+                    {telemetry.knowledge_graph?.top_pagerank_entities?.length > 0 && <>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginTop: 12, marginBottom: 8 }}>Top PageRank</div>
+                      {telemetry.knowledge_graph.top_pagerank_entities.map((e, i) => (
+                        <div key={i} className="telemetry-row">
+                          <span className="telemetry-key">{e.label}</span>
+                          <span className="telemetry-val" style={{ color: '#10b981' }}>{e.pagerank}</span>
+                        </div>
+                      ))}
+                    </>}
+                  </div>
+
+                  {/* Blockchain */}
+                  <div className="telemetry-card" style={{ borderTop: '3px solid #7c3aed' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ padding: 9, borderRadius: 11, background: '#f5f3ff', border: '1px solid rgba(139,92,246,0.22)' }}>
+                          <Lock size={16} color="#7c3aed" />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Blockchain Ledger</div>
+                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>SHA-256 · Merkle Tree</div>
+                        </div>
+                      </div>
+                      <span className="badge badge-purple">Sealed</span>
+                    </div>
+                    {[['Block Height', `#${telemetry.blockchain_audit_ledger?.block_height}`], ['Status', telemetry.blockchain_audit_ledger?.status], ['Audit Events', telemetry.blockchain_audit_ledger?.total_audit_events]].map(([k, v]) => (
+                      <div key={k} className="telemetry-row">
+                        <span className="telemetry-key">{k}</span>
+                        <span className="telemetry-val" style={{ color: '#7c3aed' }}>{v}</span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 10.5, color: '#9ca3af', marginBottom: 4 }}>Merkle Root</div>
+                      <div className="hash-code" style={{ color: '#7c3aed' }}>{telemetry.blockchain_audit_ledger?.merkle_root?.slice(0, 32)}…</div>
                     </div>
                   </div>
 
-                  {/* NetworkX Knowledge Graph */}
-                  <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div className="flex items-center space-x-2">
-                        <Network className="w-5 h-5 text-emerald-400" />
-                        <h3 className="font-bold text-slate-100 text-sm">Knowledge Graph Engine</h3>
+                  {/* BM25 */}
+                  <div className="telemetry-card" style={{ borderTop: '3px solid #f59e0b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ padding: 9, borderRadius: 11, background: '#fffbeb', border: '1px solid rgba(245,158,11,0.22)' }}>
+                          <FileCode size={16} color="#f59e0b" />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>BM25 Keyword Engine</div>
+                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>Custom BM25 · Pickle Persistence</div>
+                        </div>
                       </div>
-                      <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded font-mono">ACTIVE</span>
+                      <span className="badge badge-amber">Ready</span>
                     </div>
-                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
-                      <p><span className="text-slate-500">Engine:</span> {telemetry.knowledge_graph?.engine}</p>
-                      <p><span className="text-slate-500">Total Nodes:</span> <strong className="text-emerald-400">{telemetry.knowledge_graph?.total_nodes}</strong></p>
-                      <p><span className="text-slate-500">Total Edges:</span> <strong className="text-emerald-400">{telemetry.knowledge_graph?.total_edges}</strong></p>
-                      <p><span className="text-slate-500">Density:</span> {telemetry.knowledge_graph?.graph_density}</p>
-                    </div>
+                    {[['Engine', telemetry.bm25_keyword_store?.engine], ['Indexed Docs', telemetry.bm25_keyword_store?.indexed_documents], ['Vocabulary Size', telemetry.bm25_keyword_store?.vocabulary_size], ['Avg Doc Length', telemetry.bm25_keyword_store?.avg_doc_length]].map(([k, v]) => (
+                      <div key={k} className="telemetry-row">
+                        <span className="telemetry-key">{k}</span>
+                        <span className="telemetry-val" style={{ color: '#b45309' }}>{v}</span>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Blockchain Ledger */}
-                  <div className="bg-slate-900 border border-purple-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div className="flex items-center space-x-2">
-                        <Lock className="w-5 h-5 text-purple-400" />
-                        <h3 className="font-bold text-slate-100 text-sm">Merkle Blockchain Ledger</h3>
+                  {/* Verifier — full width */}
+                  <div className="telemetry-card" style={{ borderTop: '3px solid #10b981', gridColumn: 'span 2' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                      <div style={{ padding: 9, borderRadius: 11, background: '#ecfdf5', border: '1px solid rgba(16,185,129,0.22)' }}>
+                        <ShieldCheck size={16} color="#10b981" />
                       </div>
-                      <span className="px-2 py-0.5 text-[10px] font-bold bg-purple-500/20 text-purple-300 rounded font-mono">SEALED</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
-                      <p><span className="text-slate-500">Chain Height:</span> <strong className="text-purple-400">#{telemetry.blockchain_audit_ledger?.block_height}</strong></p>
-                      <p><span className="text-slate-500">Merkle Root:</span> <span className="text-[10px] text-slate-300 font-mono truncate">{telemetry.blockchain_audit_ledger?.merkle_root?.slice(0, 24)}...</span></p>
-                    </div>
-                  </div>
-
-                  {/* BM25 Keyword Search */}
-                  <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div className="flex items-center space-x-2">
-                        <FileCode className="w-5 h-5 text-amber-400" />
-                        <h3 className="font-bold text-slate-100 text-sm">BM25 Keyword Search</h3>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Multi-Agent Verification Pipeline</div>
+                        <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>3 cooperative agents · Real-time grounding analysis</div>
                       </div>
-                      <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded font-mono">READY</span>
                     </div>
-                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
-                      <p><span className="text-slate-500">Engine:</span> {telemetry.bm25_keyword_store?.engine}</p>
-                      <p><span className="text-slate-500">Indexed Docs:</span> <strong className="text-amber-400">{telemetry.bm25_keyword_store?.indexed_documents}</strong></p>
+                    <div style={{ display: 'flex', gap: 14 }}>
+                      {(telemetry.multi_agent_verifier?.agents || []).map((a, i) => (
+                        <div key={i} style={{ flex: 1, padding: 16, background: '#ecfdf5', borderRadius: 12, border: '1px solid rgba(16,185,129,0.18)', textAlign: 'center' }}>
+                          <CheckCircle2 size={18} color="#10b981" style={{ margin: '0 auto 8px', display: 'block' }} />
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{a}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 14, padding: '10px 14px', background: '#f8f9ff', borderRadius: 9, fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#6b7280' }}>
+                      Formula: <span style={{ color: '#6366f1', fontWeight: 700 }}>{telemetry.multi_agent_verifier?.trust_formula}</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 font-mono">Loading telemetry data...</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 18 }}>
+                  {[0,1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 220 }} />)}
+                </div>
               )}
             </div>
           )}
 
-          {/* TAB 7: CHAT HISTORY */}
-          {activeTab === 'history' && (
-            <div className="max-w-4xl mx-auto space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-100">Query History</h2>
-                <button onClick={fetchHistory} className="text-xs text-slate-400 hover:text-slate-200 flex items-center space-x-1">
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Refresh</span>
-                </button>
-              </div>
-              {chatHistory.length === 0 ? (
-                <p className="text-xs text-slate-500">No query history found yet.</p>
-              ) : chatHistory.map((item) => (
-                <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-md">
-                  <p className="text-sm font-bold text-slate-100">❓ {item.query}</p>
-                  <p className="text-xs text-slate-300 line-clamp-2">{item.answer}</p>
-                </div>
-              ))}
+          {/* ======================================================
+              CHAT HISTORY
+              ====================================================== */}
+          {tab === 'history' && (
+            <div style={{ maxWidth: 820, margin: '0 auto' }}>
+              <PageHeader icon={Clock} color="#f59e0b" title="Chat History" sub={`${history.length} past queries`}
+                action={<button onClick={async () => { const d = await api.get('/api/history'); if (Array.isArray(d)) setHistory(d); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}><RefreshCw size={13} /> Refresh</button>} />
+              {history.length === 0 ? <EmptyState icon={Clock} message="No query history yet. Ask a question in RAG Studio." />
+                : history.map((item, i) => (
+                  <div key={item.id || i} className="card card-p" style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <div style={{ padding: 8, borderRadius: 9, background: '#eff2ff', border: '1px solid rgba(99,102,241,0.18)', flexShrink: 0 }}>
+                          <Search size={13} color="#6366f1" />
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: '#1a1d2e', lineHeight: 1.5 }}>{item.query}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <RiskBadge risk={item.hallucination_risk} />
+                        <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>{item.trust_score}% trust</span>
+                      </div>
+                    </div>
+                    <p style={{ margin: '0 0 10px', fontSize: 12.5, color: '#6b7280', lineHeight: 1.7 }}>{item.answer}</p>
+                    <div style={{ fontSize: 10.5, color: '#9ca3af', fontFamily: 'var(--font-mono)' }}>{new Date(item.timestamp).toLocaleString()}</div>
+                  </div>
+                ))}
             </div>
           )}
 
