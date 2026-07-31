@@ -38,13 +38,15 @@ frontend/dist/
 
 # Data & storage
 backend/data/
+*Cachehuggingface*
 *.log
 *.sqlite3
 
-# Environment variables
+# Environment variables (NEVER commit these - contain API keys)
 .env
 .env.local
 .env.*.local
+backend/.env
 
 # IDE & Editor files
 .vscode/
