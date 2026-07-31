@@ -3,12 +3,13 @@ import {
   Network, Database, ShieldCheck, FileText, Search, Upload,
   Sliders, CheckCircle2, RefreshCw, Lock, Sparkles, LogIn,
   LogOut, User, Clock, Activity, Eye, EyeOff, Send, Layers,
-  AlertTriangle, ArrowRight, Zap, Info, FileCode, Check, Cpu
+  AlertTriangle, ArrowRight, Zap, Info, FileCode, Check, Cpu,
+  Terminal, Server, CheckSquare, Hash, BookOpen
 } from 'lucide-react';
 import { Network as VisNetwork } from 'vis-network';
 
 // ============================================================
-// API Helpers (Direct Target Port 8000)
+// API Helpers (Target Direct Port 8000)
 // ============================================================
 const API_BASE = 'http://localhost:8000';
 
@@ -93,7 +94,7 @@ function AuthPage({ onLogin }) {
             <Network className="w-9 h-9 text-white" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">Enterprise Graph-RAG</h1>
-          <p className="text-slate-400 text-sm mt-1.5 font-medium">Knowledge Intelligence & Verification Platform</p>
+          <p className="text-slate-400 text-sm mt-1.5 font-medium">Knowledge Intelligence Platform</p>
         </div>
 
         <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl ring-1 ring-slate-800">
@@ -150,7 +151,7 @@ function AuthPage({ onLogin }) {
                     value={form.full_name}
                     onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                    placeholder="John Doe"
+                    placeholder="Alex Smith"
                   />
                 </div>
                 <div>
@@ -188,7 +189,7 @@ function AuthPage({ onLogin }) {
               className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition shadow-lg shadow-blue-500/25 disabled:opacity-60 mt-2"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-              <span>{loading ? 'Authenticating...' : (mode === 'login' ? 'Sign In to Workspace' : 'Create Enterprise Account')}</span>
+              <span>{loading ? 'Authenticating...' : (mode === 'login' ? 'Sign In to Workspace' : 'Create Account')}</span>
             </button>
           </form>
         </div>
@@ -204,6 +205,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [health, setHealth] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
@@ -237,7 +239,7 @@ export default function App() {
   const [ingestionLogs, setIngestionLogs] = useState([]);
   const [ingestionComplete, setIngestionComplete] = useState(false);
 
-  // Check auth token on mount
+  // Validate user session
   useEffect(() => {
     const token = api.getToken();
     if (token) {
@@ -247,9 +249,10 @@ export default function App() {
     }
   }, []);
 
-  // Refresh stats
+  // Refresh system data
   useEffect(() => {
     fetchHealth();
+    fetchTelemetry();
     fetchGraphData();
     fetchLedger();
     fetchDocuments();
@@ -259,6 +262,11 @@ export default function App() {
   const fetchHealth = async () => {
     const data = await api.get('/api/health');
     if (data && data.status) setHealth(data);
+  };
+
+  const fetchTelemetry = async () => {
+    const data = await api.get('/api/system/telemetry');
+    if (data && data.qdrant_vector_store) setTelemetry(data);
   };
 
   const fetchGraphData = async () => {
@@ -290,7 +298,7 @@ export default function App() {
     setLoading(true);
     try {
       await api.post('/api/seed_demo', {});
-      await Promise.all([fetchHealth(), fetchGraphData(), fetchLedger(), fetchDocuments()]);
+      await Promise.all([fetchHealth(), fetchTelemetry(), fetchGraphData(), fetchLedger(), fetchDocuments()]);
     } finally { setLoading(false); }
   };
 
@@ -311,7 +319,7 @@ export default function App() {
         const docId = res.data.document_id;
         setActiveIngestionDocId(docId);
         
-        // Poll for step logs
+        // Poll step logs
         const interval = setInterval(async () => {
           const logRes = await api.get(`/api/documents/${docId}/logs`);
           if (logRes && Array.isArray(logRes.logs)) {
@@ -321,6 +329,7 @@ export default function App() {
             setIngestionComplete(true);
             clearInterval(interval);
             fetchHealth();
+            fetchTelemetry();
             fetchGraphData();
             fetchDocuments();
           }
@@ -333,7 +342,7 @@ export default function App() {
     } finally { setUploading(false); }
   };
 
-  // Instant Search Query
+  // Instant Query
   const handleQuerySubmit = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -352,15 +361,16 @@ export default function App() {
       if (res.ok && res.data) {
         setQueryResponse(res.data);
         fetchHealth();
+        fetchTelemetry();
         fetchLedger();
         fetchHistory();
       } else {
-        alert(res.data.detail || 'Query execution failed.');
+        alert(res.data.detail || 'Query failed.');
       }
     } finally { setLoading(false); }
   };
 
-  // SSE Live Token Stream Query
+  // SSE Stream Query
   const handleStreamQuery = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -386,7 +396,7 @@ export default function App() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        setStreamedAnswer(`Streaming error: ${errData.detail || 'Failed to initialize stream. Use Instant Search.'}`);
+        setStreamedAnswer(`Streaming error: ${errData.detail || 'Failed to initialize stream.'}`);
         setIsStreaming(false);
         return;
       }
@@ -422,7 +432,7 @@ export default function App() {
     } finally { setIsStreaming(false); }
   };
 
-  // Vis-Network Graph Visualization
+  // Vis-Network Canvas
   useEffect(() => {
     if (activeTab === 'graph' && visJsRef.current && graphData && graphData.nodes && graphData.nodes.length > 0) {
       const nodes = graphData.nodes.map(n => ({
@@ -467,8 +477,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
 
-      {/* Navbar */}
-      <header className="border-b border-slate-800/90 bg-slate-900/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-50 shadow-md">
+      {/* Top Navbar */}
+      <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-50 shadow-md">
         <div className="flex items-center space-x-3.5">
           <div className="p-2.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-xl shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
             <Network className="w-6 h-6 text-white" />
@@ -482,7 +492,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* System Metrics */}
+        {/* System Stats Bar */}
         <div className="hidden lg:flex items-center space-x-3">
           <div className="px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center space-x-2 text-xs shadow-inner">
             <Database className="w-4 h-4 text-blue-400" />
@@ -520,14 +530,15 @@ export default function App() {
 
         {/* Sidebar */}
         <aside className="w-full md:w-64 border-r border-slate-800/80 bg-slate-900/70 p-4 space-y-2 flex-shrink-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">Navigation Menu</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">Workspace Menu</div>
           {[
-            { key: 'chat', icon: Search, label: 'RAG Studio', color: 'blue' },
-            { key: 'graph', icon: Network, label: 'Knowledge Graph', color: 'emerald' },
-            { key: 'ingestion', icon: Upload, label: 'Documents Library', color: 'indigo' },
-            { key: 'verification', icon: ShieldCheck, label: 'Multi-Agent Verifier', color: 'amber' },
-            { key: 'blockchain', icon: Lock, label: 'Blockchain Ledger', color: 'purple' },
-            { key: 'history', icon: Clock, label: 'Chat History', color: 'pink' },
+            { key: 'chat', icon: Search, label: 'RAG Studio' },
+            { key: 'graph', icon: Network, label: 'Knowledge Graph' },
+            { key: 'ingestion', icon: Upload, label: 'Documents Library' },
+            { key: 'verification', icon: ShieldCheck, label: 'Multi-Agent Verifier' },
+            { key: 'blockchain', icon: Lock, label: 'Blockchain Ledger' },
+            { key: 'telemetry', icon: Terminal, label: 'Component Telemetry & Logs' },
+            { key: 'history', icon: Clock, label: 'Chat History' },
           ].map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -539,7 +550,7 @@ export default function App() {
             </button>
           ))}
 
-          {/* Quick Ingestion Panel */}
+          {/* Quick Ingestion */}
           <div className="pt-6">
             <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 space-y-3 shadow-md">
               <div className="flex items-center space-x-2 text-xs font-bold text-slate-200">
@@ -561,14 +572,14 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Content View */}
+        {/* Main Content Area */}
         <main className="flex-1 p-6 bg-slate-950 overflow-y-auto">
 
           {/* TAB 1: RAG STUDIO */}
           {activeTab === 'chat' && (
             <div className="space-y-6 max-w-5xl mx-auto">
 
-              {/* How it Works Banner */}
+              {/* Guide Banner */}
               {showGuide && (
                 <div className="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-500/30 rounded-2xl p-5 relative shadow-lg">
                   <button onClick={() => setShowGuide(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 text-xs font-bold font-mono">✕ Dismiss Guide</button>
@@ -588,7 +599,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Hybrid Retrieval Controls */}
+              {/* Retrieval Weight Controls */}
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -643,7 +654,7 @@ export default function App() {
                 </div>
               </form>
 
-              {/* Live Streaming Box */}
+              {/* Streaming Box */}
               {(isStreaming || streamedAnswer) && (
                 <div className="bg-slate-900/95 border border-blue-500/40 rounded-2xl p-6 space-y-4 shadow-2xl">
                   <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
@@ -886,7 +897,93 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 6: CHAT HISTORY */}
+          {/* TAB 6: NEW COMPONENT TELEMETRY & LIVE LOGS */}
+          {activeTab === 'telemetry' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-100">Under-the-Hood Component Telemetry</h2>
+                  <p className="text-xs text-slate-400">Live operational metrics and logs for Vector Store, Graph Engine, Blockchain, and BM25.</p>
+                </div>
+                <button onClick={fetchTelemetry} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 rounded-lg flex items-center space-x-1.5 transition">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh Telemetry</span>
+                </button>
+              </div>
+
+              {telemetry ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Qdrant Vector Store */}
+                  <div className="bg-slate-900 border border-blue-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-blue-400" />
+                        <h3 className="font-bold text-slate-100 text-sm">Qdrant Vector Database</h3>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/20 text-blue-300 rounded font-mono">OPERATIONAL</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
+                      <p><span className="text-slate-500">Storage Mode:</span> {telemetry.qdrant_vector_store?.storage_mode}</p>
+                      <p><span className="text-slate-500">Path:</span> {telemetry.qdrant_vector_store?.path}</p>
+                      <p><span className="text-slate-500">Dimension:</span> {telemetry.qdrant_vector_store?.vector_dimension}D ({telemetry.qdrant_vector_store?.distance_metric})</p>
+                      <p><span className="text-slate-500">Indexed Chunks:</span> <strong className="text-blue-400">{telemetry.qdrant_vector_store?.indexed_chunks}</strong></p>
+                    </div>
+                  </div>
+
+                  {/* NetworkX Knowledge Graph */}
+                  <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center space-x-2">
+                        <Network className="w-5 h-5 text-emerald-400" />
+                        <h3 className="font-bold text-slate-100 text-sm">Knowledge Graph Engine</h3>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded font-mono">ACTIVE</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
+                      <p><span className="text-slate-500">Engine:</span> {telemetry.knowledge_graph?.engine}</p>
+                      <p><span className="text-slate-500">Total Nodes:</span> <strong className="text-emerald-400">{telemetry.knowledge_graph?.total_nodes}</strong></p>
+                      <p><span className="text-slate-500">Total Edges:</span> <strong className="text-emerald-400">{telemetry.knowledge_graph?.total_edges}</strong></p>
+                      <p><span className="text-slate-500">Density:</span> {telemetry.knowledge_graph?.graph_density}</p>
+                    </div>
+                  </div>
+
+                  {/* Blockchain Ledger */}
+                  <div className="bg-slate-900 border border-purple-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center space-x-2">
+                        <Lock className="w-5 h-5 text-purple-400" />
+                        <h3 className="font-bold text-slate-100 text-sm">Merkle Blockchain Ledger</h3>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-purple-500/20 text-purple-300 rounded font-mono">SEALED</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
+                      <p><span className="text-slate-500">Chain Height:</span> <strong className="text-purple-400">#{telemetry.blockchain_audit_ledger?.block_height}</strong></p>
+                      <p><span className="text-slate-500">Merkle Root:</span> <span className="text-[10px] text-slate-300 font-mono truncate">{telemetry.blockchain_audit_ledger?.merkle_root?.slice(0, 24)}...</span></p>
+                    </div>
+                  </div>
+
+                  {/* BM25 Keyword Search */}
+                  <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center space-x-2">
+                        <FileCode className="w-5 h-5 text-amber-400" />
+                        <h3 className="font-bold text-slate-100 text-sm">BM25 Keyword Search</h3>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded font-mono">READY</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs font-mono text-slate-300">
+                      <p><span className="text-slate-500">Engine:</span> {telemetry.bm25_keyword_store?.engine}</p>
+                      <p><span className="text-slate-500">Indexed Docs:</span> <strong className="text-amber-400">{telemetry.bm25_keyword_store?.indexed_documents}</strong></p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 font-mono">Loading telemetry data...</p>
+              )}
+            </div>
+          )}
+
+          {/* TAB 7: CHAT HISTORY */}
           {activeTab === 'history' && (
             <div className="max-w-4xl mx-auto space-y-4">
               <div className="flex items-center justify-between">
