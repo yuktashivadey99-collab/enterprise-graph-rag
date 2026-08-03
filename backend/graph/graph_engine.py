@@ -192,13 +192,12 @@ class GraphEngineeringEngine:
     def _save_to_disk(self):
         """Persist graph to JSON file so it survives restarts."""
         try:
-            data = nx.node_link_data(self.graph)
-            # Convert sets to lists for JSON serialization
+            data = nx.node_link_data(self.graph, edges="links")
             for node in data["nodes"]:
                 for k, v in node.items():
                     if isinstance(v, set):
                         node[k] = list(v)
-            for link in data["links"]:
+            for link in data.get("links", data.get("edges", [])):
                 for k, v in link.items():
                     if isinstance(v, set):
                         link[k] = list(v)
@@ -215,7 +214,7 @@ class GraphEngineeringEngine:
         try:
             with open(self._persistence_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.graph = nx.node_link_graph(data)
+            self.graph = nx.node_link_graph(data, edges="links")
             print(f"[GraphEngine] Restored graph: {len(self.graph.nodes())} nodes, {len(self.graph.edges())} edges")
         except Exception as e:
             print(f"[GraphEngine] Warning: Could not restore graph: {e}")
