@@ -89,7 +89,7 @@ class DocumentProcessor:
         pages = []
         full_text_parts = []
 
-        if pypdf:
+        if pypdf and content.startswith(b"%PDF-"):
             try:
                 reader = pypdf.PdfReader(io.BytesIO(content))
                 for idx, page in enumerate(reader.pages):
@@ -101,10 +101,10 @@ class DocumentProcessor:
             except Exception as e:
                 print(f"[DocProcessor] PyPDF error: {e}")
 
-        # Fallback: raw text extraction from PDF bytes
+        # Fallback: text decoding for text strings or non-binary PDFs
         decoded = content.decode("latin-1", errors="ignore")
         text_matches = re.findall(r'[\x20-\x7E\s]{4,}', decoded)
-        fallback_text = "\n".join(text_matches) if text_matches else "[Scanned PDF — OCR Required]"
+        fallback_text = "\n".join(text_matches) if text_matches else decoded
         return [{"page_num": 1, "text": fallback_text}], fallback_text
 
     def _extract_docx(self, content: bytes):
