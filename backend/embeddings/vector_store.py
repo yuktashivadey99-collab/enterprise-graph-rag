@@ -14,10 +14,13 @@ COLLECTION_NAME = "enterprise_chunks"
 
 class VectorStore:
     def __init__(self):
-        # Embedded mode - persistent to disk, no server needed
-        self.client = QdrantClient(path=config.QDRANT_PATH)
+        try:
+            self.client = QdrantClient(path=config.QDRANT_PATH)
+            print(f"[VectorStore] Qdrant embedded initialized at '{config.QDRANT_PATH}'")
+        except Exception as e:
+            print(f"[VectorStore] Storage path locked ({e}). Initializing Qdrant in memory mode.")
+            self.client = QdrantClient(location=":memory:")
         self._ensure_collection()
-        print(f"[VectorStore] Qdrant embedded initialized at '{config.QDRANT_PATH}'")
 
     def _ensure_collection(self):
         """Create collection if it doesn't exist."""
