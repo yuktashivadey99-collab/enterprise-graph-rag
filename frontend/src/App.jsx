@@ -5,11 +5,11 @@ import {
   Sliders, CheckCircle2, RefreshCw, Lock, Sparkles, LogIn,
   LogOut, User, Clock, Activity, Eye, EyeOff, Send,
   AlertTriangle, FileCode, Terminal, Hash, X, Menu,
-  TrendingUp, ChevronRight, Inbox, Shield
+  TrendingUp, ChevronRight, Inbox, Shield, Cpu, Layers, Palette
 } from 'lucide-react';
 
 /* ================================================================
-   API LAYER
+   API CLIENT
    ================================================================ */
 const API = 'http://localhost:8000';
 const api = {
@@ -29,7 +29,7 @@ const api = {
       const r = await fetch(API + p, { method: 'POST', headers: this.hdrs(), body: JSON.stringify(b) });
       const d = await r.json().catch(() => ({}));
       return { ok: r.ok, data: d };
-    } catch { return { ok: false, data: { detail: 'Cannot reach server.' } }; }
+    } catch { return { ok: false, data: { detail: 'Cannot connect to backend server.' } }; }
   },
   async upload(p, form) {
     try {
@@ -42,48 +42,47 @@ const api = {
 };
 
 /* ================================================================
-   MICRO-COMPONENTS
+   SPATIAL MICRO-COMPONENTS
    ================================================================ */
-
-const Spinner = ({ size = 15 }) => (
-  <RefreshCw size={size} className="spin" />
+const Spinner = ({ size = 16 }) => (
+  <RefreshCw size={size} className="spin text-cyan-400" />
 );
 
 const RiskBadge = ({ risk }) => {
   if (!risk) return null;
   const m = { LOW: 'badge-green', MEDIUM: 'badge-amber', HIGH: 'badge-red' };
-  return <span className={`badge ${m[risk] || 'badge-slate'}`}>{risk} risk</span>;
+  return <span className={`badge ${m[risk] || 'badge-slate'}`}>{risk} RISK</span>;
 };
 
 const TrustRing = ({ score }) => {
   const s = Math.max(0, Math.min(100, score || 0));
-  const r = 30; const c = 2 * Math.PI * r;
-  const col = s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#ef4444';
+  const r = 32; const c = 2 * Math.PI * r;
+  const col = s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e';
   return (
     <div style={{ textAlign: 'center', flexShrink: 0 }}>
-      <div style={{ position: 'relative', width: 74, height: 74 }}>
-        <svg width="74" height="74" style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx="37" cy="37" r={r} stroke="#f0f2f7" strokeWidth="6" fill="none" />
-          <circle cx="37" cy="37" r={r} stroke={col} strokeWidth="6" fill="none"
+      <div style={{ position: 'relative', width: 80, height: 80 }}>
+        <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="40" cy="40" r={r} stroke="rgba(255,255,255,0.08)" strokeWidth="6" fill="none" />
+          <circle cx="40" cy="40" r={r} stroke={col} strokeWidth="6" fill="none"
             strokeDasharray={c} strokeDashoffset={c - (s / 100) * c}
             strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 0.7s cubic-bezier(0.16,1,0.3,1)' }}
+            style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16,1,0.3,1)', filter: `drop-shadow(0 0 6px ${col})` }}
           />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 16, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{s}</span>
-          <span style={{ fontSize: 8, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>trust</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{s}</span>
+          <span style={{ fontSize: 8.5, color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>TRUST</span>
         </div>
       </div>
     </div>
   );
 };
 
-const PageHeader = ({ icon: Icon, color = '#6366f1', title, sub, action }) => (
-  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+const PageHeader = ({ icon: Icon, color = 'var(--accent-primary)', title, sub, action }) => (
+  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 14 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
       <div className="section-icon">
-        <Icon size={18} color={color} />
+        <Icon size={22} color={color} />
       </div>
       <div>
         <h2 className="page-title">{title}</h2>
@@ -95,11 +94,11 @@ const PageHeader = ({ icon: Icon, color = '#6366f1', title, sub, action }) => (
 );
 
 const EmptyState = ({ icon: Icon, message }) => (
-  <div style={{ textAlign: 'center', padding: '60px 24px', color: '#9ca3af' }}>
-    <div style={{ width: 52, height: 52, borderRadius: 16, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-      <Icon size={24} color="#a5b4fc" />
+  <div style={{ textAlign: 'center', padding: '70px 24px', color: 'var(--text-secondary)' }}>
+    <div style={{ width: 58, height: 58, borderRadius: 18, background: 'rgba(99,102,241,0.12)', border: '1px solid var(--border-neon)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: 'var(--glow-accent)' }}>
+      <Icon size={26} color="var(--accent-primary)" />
     </div>
-    <p style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>{message}</p>
+    <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', maxWidth: 460, margin: '0 auto', lineHeight: 1.6 }}>{message}</div>
   </div>
 );
 
@@ -129,23 +128,21 @@ function AuthPage({ onLogin }) {
       <div className="auth-orb-1" />
       <div className="auth-orb-2" />
 
-      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }} className="scale-in">
-        {/* Brand */}
+      <div style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1 }} className="scale-in">
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'inline-flex', padding: 14, borderRadius: 18, background: 'linear-gradient(135deg,#4f46e5,#8b5cf6)', boxShadow: '0 8px 28px rgba(79,70,229,0.50)', border: '1px solid rgba(255,255,255,0.18)', marginBottom: 14 }}>
-            <Network size={26} color="#fff" />
+          <div style={{ display: 'inline-flex', padding: 16, borderRadius: 20, background: 'linear-gradient(135deg,var(--accent-secondary),var(--accent-primary))', boxShadow: 'var(--glow-accent)', border: '1px solid rgba(255,255,255,0.2)', marginBottom: 16 }}>
+            <Network size={32} color="#fff" />
           </div>
-          <h1 style={{ margin: '0 0 4px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
+          <h1 style={{ margin: '0 0 6px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
             Enterprise <span className="gradient-text">Graph-RAG</span>
           </h1>
-          <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(255,255,255,0.40)', fontWeight: 500 }}>
-            Knowledge Intelligence Platform · v2.0
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>
+            Dynamic Spatial Intelligence · v2.0
           </p>
         </div>
 
         <div className="auth-card">
-          {/* Mode Switcher */}
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 4, marginBottom: 26, border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 4, marginBottom: 28, border: '1px solid var(--border-subtle)' }}>
             {['login', 'register'].map(m => (
               <button key={m} onClick={() => { setMode(m); setErr(''); }}
                 className={`auth-mode-btn ${mode === m ? 'active' : 'inactive'}`}>
@@ -155,58 +152,55 @@ function AuthPage({ onLogin }) {
           </div>
 
           {err && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, marginBottom: 18, fontSize: 12.5, color: '#fca5a5', fontWeight: 500 }}>
-              <AlertTriangle size={14} style={{ flexShrink: 0 }} /> {err}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.3)', borderRadius: 12, marginBottom: 20, fontSize: 13, color: '#fda4af', fontWeight: 600 }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0 }} /> {err}
             </div>
           )}
 
-          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[
               { key: 'username', label: 'Username', placeholder: 'your_username', type: 'text', show: true },
               { key: 'email', label: 'Email Address', placeholder: 'user@company.com', type: 'email', show: mode === 'register' },
               { key: 'full_name', label: 'Full Name', placeholder: 'Alex Smith', type: 'text', show: mode === 'register' },
               { key: 'department', label: 'Department', placeholder: 'Technology / HR / Legal', type: 'text', show: mode === 'register' },
             ].filter(fi => fi.show).map(fi => (
-              <label key={fi.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.01em' }}>{fi.label}</span>
+              <label key={fi.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.02em' }}>{fi.label}</span>
                 <input type={fi.type} required value={f[fi.key]} placeholder={fi.placeholder}
                   onChange={e => setF(p => ({ ...p, [fi.key]: e.target.value }))}
                   className="auth-input" />
               </label>
             ))}
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.01em' }}>Password</span>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.02em' }}>Password</span>
               <div style={{ position: 'relative' }}>
                 <input type={showPwd ? 'text' : 'password'} required value={f.password} placeholder="••••••••"
                   onChange={e => setF(p => ({ ...p, password: e.target.value }))}
-                  className="auth-input" style={{ paddingRight: 42 }} />
+                  className="auth-input" style={{ paddingRight: 44 }} />
                 <button type="button" onClick={() => setShowPwd(p => !p)}
-                  style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, display: 'flex' }}>
-                  {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                  style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex' }}>
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </label>
 
-            <button type="submit" disabled={loading} className="btn btn-primary" style={{ marginTop: 6, padding: '12px 20px', fontSize: 14, borderRadius: 11, width: '100%' }}>
-              {loading ? <Spinner /> : <LogIn size={15} />}
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ marginTop: 8, padding: '13px 22px', fontSize: 14.5, borderRadius: 12, width: '100%' }}>
+              {loading ? <Spinner size={16} /> : <LogIn size={16} />}
               {loading ? 'Authenticating…' : mode === 'login' ? 'Sign In to Workspace' : 'Create Account'}
             </button>
           </form>
         </div>
-
-        <p style={{ textAlign: 'center', marginTop: 18, fontSize: 11, color: 'rgba(255,255,255,0.22)' }}>
-          Secured with JWT · Powered by Gemini 2.0 Flash
-        </p>
       </div>
     </div>
   );
 }
 
 /* ================================================================
-   MAIN APP
+   MAIN MULTI-THEME APP
    ================================================================ */
 export default function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('rag_theme') || 'obsidian');
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState('rag');
   const [sidebar, setSidebar] = useState(true);
@@ -238,6 +232,12 @@ export default function App() {
   const [selNode, setSelNode] = useState(null);
   const [seeding, setSeeding] = useState(false);
 
+  // Theme Sync
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('rag_theme', theme);
+  }, [theme]);
+
   useEffect(() => {
     if (api.t()) api.get('/auth/me').then(d => d?.id && setUser(d));
   }, []);
@@ -258,44 +258,44 @@ export default function App() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  /* vis-network */
+  /* Spatial vis-network layout */
   useEffect(() => {
     if (tab !== 'graph' || !visRef.current || !graphData?.nodes?.length) return;
     const nodes = graphData.nodes.slice(0, 300).map(n => ({
       id: n.id, label: n.label, group: n.type,
-      title: `${n.type} · PR: ${n.pagerank}`,
-      size: Math.max(12, Math.min(32, 12 + (n.pagerank || 0) * 800)),
+      title: `${n.type} · PageRank: ${n.pagerank}`,
+      size: Math.max(14, Math.min(36, 14 + (n.pagerank || 0) * 900)),
     }));
     const edges = (graphData.edges || []).slice(0, 600).map(e => ({
       from: e.from, to: e.to, label: e.label || '', arrows: 'to',
-      font: { align: 'middle', size: 10, color: '#9ca3af' },
+      font: { align: 'middle', size: 10, color: 'var(--text-muted)' },
     }));
     const net = new VisNetwork(visRef.current, { nodes, edges }, {
       nodes: {
-        shape: 'dot', font: { size: 12, color: '#1a1d2e', face: 'Inter' },
-        borderWidth: 2.5, shadow: { enabled: true, color: 'rgba(0,0,0,0.12)', size: 6 },
+        shape: 'dot', font: { size: 12, color: 'var(--text-primary)', face: 'Plus Jakarta Sans' },
+        borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,0,0,0.4)', size: 8 },
       },
       groups: {
-        ORGANIZATION: { color: { background: '#eff6ff', border: '#3b82f6', highlight: { background: '#dbeafe', border: '#2563eb' } } },
-        TECHNOLOGY:   { color: { background: '#f5f3ff', border: '#7c3aed', highlight: { background: '#ede9fe', border: '#6d28d9' } } },
-        CONCEPT:      { color: { background: '#ecfdf5', border: '#059669', highlight: { background: '#d1fae5', border: '#047857' } } },
-        METRIC:       { color: { background: '#fffbeb', border: '#d97706', highlight: { background: '#fef3c7', border: '#b45309' } } },
-        PERSON:       { color: { background: '#fdf2f8', border: '#db2777', highlight: { background: '#fce7f3', border: '#be185d' } } },
-        LOCATION:     { color: { background: '#ecfeff', border: '#0891b2', highlight: { background: '#cffafe', border: '#0e7490' } } },
-        ENTITY:       { color: { background: '#f8fafc', border: '#94a3b8', highlight: { background: '#f1f5f9', border: '#64748b' } } },
+        ORGANIZATION: { color: { background: '#0284c7', border: '#38bdf8', highlight: { background: '#0369a1', border: '#7dd3fc' } } },
+        TECHNOLOGY:   { color: { background: '#7c3aed', border: '#a78bfa', highlight: { background: '#6d28d9', border: '#c4b5fd' } } },
+        CONCEPT:      { color: { background: '#059669', border: '#34d399', highlight: { background: '#047857', border: '#6ee7b7' } } },
+        METRIC:       { color: { background: '#d97706', border: '#fbbf24', highlight: { background: '#b45309', border: '#fcd34d' } } },
+        PERSON:       { color: { background: '#db2777', border: '#f472b6', highlight: { background: '#be185d', border: '#fbcfe8' } } },
+        LOCATION:     { color: { background: '#0891b2', border: '#67e8f9', highlight: { background: '#0e7490', border: '#a5f3fc' } } },
+        ENTITY:       { color: { background: '#475569', border: '#94a3b8', highlight: { background: '#334155', border: '#cbd5e1' } } },
       },
-      edges: { color: { color: '#e5e7eb', highlight: '#6366f1' }, width: 1.5, smooth: { type: 'continuous' } },
+      edges: { color: { color: 'var(--border-glass)', highlight: 'var(--accent-primary)' }, width: 1.5, smooth: { type: 'continuous' } },
       physics: {
-        forceAtlas2Based: { gravitationalConstant: -28, centralGravity: 0.004, springLength: 240, springConstant: 0.15 },
+        forceAtlas2Based: { gravitationalConstant: -30, centralGravity: 0.005, springLength: 220, springConstant: 0.16 },
         maxVelocity: 140, solver: 'forceAtlas2Based',
         stabilization: { iterations: 160 },
       },
     });
     net.on('click', p => setSelNode(p.nodes[0] ? graphData.nodes.find(n => n.id === p.nodes[0]) : null));
     return () => net.destroy();
-  }, [tab, graphData]);
+  }, [tab, graphData, theme]);
 
-  /* ingestion log polling */
+  /* Live Ingestion Log Polling */
   useEffect(() => {
     if (!ingDocId || ingDone) return;
     const iv = setInterval(async () => {
@@ -308,7 +308,7 @@ export default function App() {
 
   if (!user) return <AuthPage onLogin={d => setUser(d)} />;
 
-  /* actions */
+  /* Handlers */
   const seed = async () => {
     setSeeding(true);
     await api.post('/api/seed_demo', {});
@@ -324,7 +324,7 @@ export default function App() {
       graph_weight: +weights.graph, top_k: 5, department_filter: dept || null, use_reranker: reranker,
     });
     if (r.ok) { setQueryRes(r.data); refresh(); }
-    else alert(r.data?.detail || 'Query failed');
+    else alert(r.data?.detail || 'Query execution failed');
     setQuerying(false);
   };
 
@@ -364,68 +364,90 @@ export default function App() {
     setUploading(false); e.target.value = '';
   };
 
-  /* nav config */
   const NAV = [
-    { key: 'rag',          icon: Search,      label: 'RAG Studio',          badge: null },
+    { key: 'rag',          icon: Search,      label: 'Spatial RAG Studio',   badge: null },
     { key: 'graph',        icon: Network,     label: 'Knowledge Graph',     badge: health?.knowledge_graph?.total_nodes || null },
     { key: 'documents',    icon: FileText,    label: 'Document Library',    badge: docs.length || null },
-    { key: 'verification', icon: ShieldCheck, label: 'AI Verifier',         badge: null },
+    { key: 'verification', icon: ShieldCheck, label: 'Multi-Agent Verifier', badge: null },
     { key: 'blockchain',   icon: Lock,        label: 'Blockchain Ledger',   badge: health?.blockchain_height ? `#${health.blockchain_height}` : null },
-    { key: 'telemetry',    icon: Terminal,    label: 'Component Telemetry', badge: null },
+    { key: 'telemetry',    icon: Terminal,    label: 'System Telemetry',    badge: null },
     { key: 'history',      icon: Clock,       label: 'Chat History',        badge: history.length || null },
   ];
 
-  /* ============================================================ */
   return (
     <div className="app-layout">
 
       {/* ── TOPBAR ────────────────────────────────────────────── */}
       <header className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => setSidebar(p => !p)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.45)', padding: 6, borderRadius: 7, display: 'flex', transition: 'color 0.15s' }}>
-            {sidebar ? <X size={17} /> : <Menu size={17} />}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 6, borderRadius: 8, display: 'flex', transition: 'all 0.2s' }}>
+            {sidebar ? <X size={18} /> : <Menu size={18} />}
           </button>
           <div className="topbar-logo">
-            <div className="logo-icon"><Network size={17} color="#fff" /></div>
+            <div className="logo-icon"><Network size={20} color="#fff" /></div>
             <div>
-              <div className="topbar-title">Graph-RAG</div>
-              <div className="topbar-sub">Enterprise Intelligence Platform</div>
+              <div className="topbar-title">Enterprise Graph-RAG</div>
+              <div className="topbar-sub">Spatial Multi-Theme Studio</div>
             </div>
           </div>
         </div>
 
-        {/* Centre Stats */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        {/* Live Telemetry Pills */}
+        <div className="hidden lg:flex items-center space-x-3">
           {[
-            { i: Database, v: health?.vector_store_chunks || 0, l: 'vectors',     c: '#818cf8' },
-            { i: Network,  v: health?.knowledge_graph?.total_nodes || 0, l: 'nodes', c: '#34d399' },
-            { i: Lock,     v: `#${health?.blockchain_height || 1}`, l: 'blocks',  c: '#a78bfa' },
+            { i: Database, v: health?.vector_store_chunks || 0, l: 'vectors',     c: 'var(--accent-primary)' },
+            { i: Network,  v: health?.knowledge_graph?.total_nodes || 0, l: 'nodes', c: 'var(--accent-success)' },
+            { i: Lock,     v: `#${health?.blockchain_height || 1}`, l: 'blocks',  c: 'var(--accent-tertiary)' },
           ].map(({ i: I, v, l, c }) => (
             <div key={l} className="stat-pill">
-              <I size={12} color={c} />
+              <I size={13} color={c} />
               <span className="stat-pill-val">{v}</span>
               <span>{l}</span>
             </div>
           ))}
         </div>
 
-        {/* Right */}
+        {/* Theme Switcher & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={seed} disabled={seeding} className="btn btn-primary" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8 }}>
-            {seeding ? <Spinner size={12} /> : <Sparkles size={12} />}
+          
+          {/* Dynamic Theme Selector */}
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', borderRadius: 12, padding: 3 }}>
+            {[
+              { id: 'obsidian', label: '🌌 Obsidian' },
+              { id: 'cyberpunk', label: '💎 Cyberpunk' },
+              { id: 'emerald', label: '🍃 Emerald' },
+              { id: 'pearl', label: '☀️ Pearl' }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                style={{
+                  padding: '4px 9px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700, transition: 'all 0.2s',
+                  background: theme === t.id ? 'var(--accent-secondary)' : 'transparent',
+                  color: theme === t.id ? '#ffffff' : 'var(--text-muted)'
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={seed} disabled={seeding} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: 12.5, borderRadius: 10 }}>
+            {seeding ? <Spinner size={14} /> : <Sparkles size={14} />}
             Seed Demo Data
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 14px 6px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <User size={13} color="#fff" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 14px 6px 8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', borderRadius: 12 }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--accent-secondary),var(--accent-primary))', display: 'flex', alignItems: 'center', justifyCenter: 'center', boxShadow: 'var(--glow-accent)' }}>
+              <User size={14} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{user.username}</div>
-              <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{user.role}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>{user.username}</div>
+              <div style={{ fontSize: 9.5, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{user.role}</div>
             </div>
-            <button onClick={() => { api.clear(); setUser(null); }} className="btn btn-danger" style={{ padding: '5px 8px', borderRadius: 7, marginLeft: 4, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
-              <LogOut size={13} />
+            <button onClick={() => { api.clear(); setUser(null); }} className="btn btn-danger" style={{ padding: '6px 10px', borderRadius: 8, marginLeft: 4 }}>
+              <LogOut size={14} />
             </button>
           </div>
         </div>
@@ -437,11 +459,11 @@ export default function App() {
         {/* SIDEBAR */}
         <aside className={`sidebar ${sidebar ? '' : 'collapsed'}`}>
           <div className="sidebar-inner">
-            <div className="nav-section-label">Workspace</div>
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div className="nav-section-label">Spatial Modules</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {NAV.map(({ key, icon: Icon, label, badge }) => (
                 <button key={key} onClick={() => setTab(key)} className={`nav-item ${tab === key ? 'active' : ''}`}>
-                  <Icon size={15} />
+                  <Icon size={16} />
                   <span style={{ flex: 1 }}>{label}</span>
                   {badge && <span className="nav-badge">{badge}</span>}
                 </button>
@@ -449,57 +471,57 @@ export default function App() {
             </nav>
 
             <div className="sidebar-divider" style={{ marginTop: 'auto' }} />
-            <div className="nav-section-label">Quick Upload</div>
+            <div className="nav-section-label">Quick File Ingestion</div>
             <div className="upload-widget">
               <input type="text" value={dept} onChange={e => setDept(e.target.value)}
-                placeholder="Department tag (optional)"
-                style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8, color: 'rgba(255,255,255,0.7)', fontSize: 11.5, outline: 'none', marginBottom: 8, fontFamily: 'var(--font-sans)' }}
+                placeholder="Department tag (e.g. Tech, HR)"
+                style={{ width: '100%', padding: '8px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-glass)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12, outline: 'none', marginBottom: 10, fontFamily: 'var(--font-sans)' }}
               />
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 8, background: 'rgba(99,102,241,0.14)', border: '1px dashed rgba(129,140,248,0.40)', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: 11.5, fontWeight: 600, color: '#a5b4fc', transition: 'all 0.18s' }}>
-                <Upload size={12} />
-                {uploading ? 'Processing…' : 'Select & Upload File'}
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 10, background: 'rgba(99,102,241,0.18)', border: '1px dashed var(--border-neon)', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, color: 'var(--accent-primary)', transition: 'all 0.2s' }}>
+                <Upload size={14} />
+                {uploading ? 'Processing…' : 'Upload File'}
                 <input type="file" onChange={doUpload} disabled={uploading} style={{ display: 'none' }} accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
               </label>
             </div>
           </div>
         </aside>
 
-        {/* MAIN */}
+        {/* MAIN CONTENT */}
         <main className="main-content">
 
           {/* ======================================================
-              RAG STUDIO
+              SPATIAL RAG STUDIO
               ====================================================== */}
           {tab === 'rag' && (
-            <div style={{ maxWidth: 860, margin: '0 auto' }}>
-              <PageHeader icon={Search} title="RAG Studio" sub="Hybrid Vector · BM25 Keyword · Knowledge Graph retrieval with Gemini 2.0 AI" />
+            <div style={{ maxWidth: 940, margin: '0 auto' }}>
+              <PageHeader icon={Search} color="var(--accent-primary)" title="Spatial RAG Studio" sub="Hybrid Vector · BM25 Keyword · Knowledge Graph Retrieval with Gemini 2.0 AI" />
 
-              {/* Retrieval Sliders */}
-              <div className="card card-p" style={{ marginBottom: 18 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <Sliders size={14} color="#6366f1" />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Hybrid Retrieval Weights</span>
-                    <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>RRF Fusion</span>
+              {/* RRF Weight Deck */}
+              <div className="card card-p" style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Sliders size={16} color="var(--accent-primary)" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Spatial RRF Retrieval Weights</span>
+                    <span className="badge badge-blue">RRF Fusion</span>
                   </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#6b7280', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={reranker} onChange={e => setReranker(e.target.checked)} />
                     Neural Re-Ranker
                   </label>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
                   {[
-                    { k: 'vector', l: 'Vector Similarity', sub: 'Qdrant · all-MiniLM-L6-v2', col: '#6366f1' },
-                    { k: 'keyword', l: 'BM25 Keyword', sub: 'Custom BM25 · TF-IDF', col: '#8b5cf6' },
-                    { k: 'graph', l: 'Knowledge Graph', sub: 'NetworkX · PageRank', col: '#10b981' },
+                    { k: 'vector', l: 'Vector Similarity', sub: 'Qdrant · 384D MiniLM', col: 'var(--accent-primary)' },
+                    { k: 'keyword', l: 'BM25 Keyword', sub: 'Custom BM25 · TF-IDF', col: 'var(--accent-tertiary)' },
+                    { k: 'graph', l: 'Knowledge Graph', sub: 'NetworkX · PageRank', col: 'var(--accent-success)' },
                   ].map(({ k, l, sub, col }) => (
-                    <div key={k} style={{ background: '#f8f9ff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'flex-start' }}>
+                    <div key={k} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-subtle)', borderRadius: 16, padding: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'flex-start' }}>
                         <div>
-                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a1d2e' }}>{l}</div>
-                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{sub}</div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)' }}>{l}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{sub}</div>
                         </div>
-                        <span style={{ fontSize: 20, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{weights[k]}</span>
+                        <span style={{ fontSize: 22, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{weights[k]}</span>
                       </div>
                       <input type="range" min="0" max="1" step="0.1" value={weights[k]}
                         onChange={e => setWeights(p => ({ ...p, [k]: e.target.value }))} />
@@ -508,95 +530,95 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Search Bar */}
-              <form onSubmit={runQuery} style={{ position: 'relative', marginBottom: 22 }}>
+              {/* Spatial Search Bar */}
+              <form onSubmit={runQuery} style={{ position: 'relative', marginBottom: 24 }}>
                 <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-                  placeholder="Ask anything — 'How many casual leaves do employees get?' or 'What is our AI tech stack?'"
+                  placeholder="Ask enterprise documents — e.g. 'How many casual leaves do employees get?' or 'What is our tech stack?'"
                   className="input search-input"
-                  style={{ paddingRight: 190 }}
+                  style={{ paddingRight: 210 }}
                 />
-                <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 6 }}>
-                  <button type="submit" disabled={querying} className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: 12.5 }}>
-                    {querying ? <Spinner size={13} /> : <Search size={13} />} Instant
+                <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 8 }}>
+                  <button type="submit" disabled={querying} className="btn btn-ghost" style={{ padding: '9px 16px', fontSize: 13 }}>
+                    {querying ? <Spinner size={14} /> : <Search size={14} />} Instant
                   </button>
-                  <button type="button" onClick={runStream} disabled={streaming} className="btn btn-primary" style={{ padding: '8px 14px', fontSize: 12.5 }}>
-                    {streaming ? <Spinner size={13} /> : <Send size={13} />} Stream AI
+                  <button type="button" onClick={runStream} disabled={streaming} className="btn btn-primary" style={{ padding: '9px 16px', fontSize: 13 }}>
+                    {streaming ? <Spinner size={14} /> : <Send size={14} />} Stream AI
                   </button>
                 </div>
               </form>
 
-              {/* Stream Output */}
+              {/* Spatial Stream Output */}
               {(streaming || streamText) && (
-                <div className="card card-accent slide-up" style={{ padding: 24, marginBottom: 20, borderColor: streaming ? 'rgba(99,102,241,0.35)' : 'rgba(16,185,129,0.30)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--border-light)' }}>
-                    <Activity size={14} color={streaming ? '#6366f1' : '#10b981'} className={streaming ? 'pulse' : ''} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1d2e' }}>
-                      {streaming ? 'Streaming from Gemini 2.0 Flash…' : 'Stream Complete'}
+                <div className="card card-accent slide-up" style={{ padding: 28, marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border-subtle)' }}>
+                    <Activity size={16} color={streaming ? 'var(--accent-primary)' : 'var(--accent-success)'} className={streaming ? 'pulse' : ''} />
+                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {streaming ? 'Streaming from Gemini 2.0 Flash…' : 'Spatial Stream Complete'}
                     </span>
                     {streamDone && <RiskBadge risk={streamDone.hallucination_risk} />}
                   </div>
-                  <p className={streaming ? 'cursor-blink' : ''} style={{ margin: 0, fontSize: 14, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap' }}>
+                  <p className={streaming ? 'cursor-blink' : ''} style={{ margin: 0, fontSize: 14.5, lineHeight: 1.8, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
                     {streamText}
                   </p>
                   {streamDone && (
-                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border-light)', display: 'flex', gap: 16, alignItems: 'center' }}>
+                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: 20, alignItems: 'center' }}>
                       <TrustRing score={streamDone.trust_score} />
-                      <div style={{ fontSize: 12, color: '#6b7280', fontFamily: 'var(--font-mono)', lineHeight: 2 }}>
-                        <div>Trust: <strong style={{ color: '#6366f1' }}>{streamDone.trust_score}%</strong></div>
-                        <div>Verdict: <strong style={{ color: '#374151' }}>{streamDone.agent_verdict}</strong></div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', lineHeight: 2 }}>
+                        <div>Trust Score: <strong style={{ color: 'var(--accent-primary)' }}>{streamDone.trust_score}%</strong></div>
+                        <div>Agent Verdict: <strong style={{ color: 'var(--text-primary)' }}>{streamDone.agent_verdict}</strong></div>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Instant Response */}
+              {/* Instant Response Card */}
               {queryRes && (
-                <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  {/* Answer */}
-                  <div className="card" style={{ padding: 26, border: '1px solid rgba(16,185,129,0.22)', boxShadow: '0 4px 16px rgba(16,185,129,0.08)' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16 }}>
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        <div style={{ padding: 10, borderRadius: 12, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.20)', flexShrink: 0 }}>
-                          <CheckCircle2 size={18} color="#10b981" />
+                <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                  <div className="card card-p" style={{ border: '1px solid var(--accent-success)', boxShadow: 'var(--glow-accent)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 18 }}>
+                      <div style={{ display: 'flex', gap: 14 }}>
+                        <div style={{ padding: 12, borderRadius: 14, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', flexShrink: 0 }}>
+                          <CheckCircle2 size={22} color="var(--accent-success)" />
                         </div>
                         <div>
-                          <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#1a1d2e' }}>Verified Knowledge Answer</h3>
-                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                            <span className="badge badge-slate" style={{ fontSize: 10 }}>⚡ {queryRes.latency_ms}ms</span>
+                          <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Verified Spatial Knowledge Answer</h3>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <span className="badge badge-slate" style={{ fontSize: 10.5 }}>⚡ {queryRes.latency_ms}ms</span>
                             <RiskBadge risk={queryRes.hallucination_risk} />
                           </div>
                         </div>
                       </div>
                       <TrustRing score={queryRes.trust_score} />
                     </div>
-                    <p style={{ margin: '0 0 20px', fontSize: 14, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap' }}>{queryRes.answer}</p>
+                    <p style={{ margin: '0 0 22px', fontSize: 14.5, lineHeight: 1.85, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{queryRes.answer}</p>
+                    
                     {/* Blockchain Seal */}
-                    <div style={{ padding: '12px 16px', background: '#f5f3ff', border: '1px solid rgba(139,92,246,0.20)', borderRadius: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <Lock size={11} color="#7c3aed" />
-                        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Blockchain Seal · Block #{queryRes.blockchain_seal?.block_index}</span>
+                    <div style={{ padding: '14px 18px', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Lock size={13} color="var(--accent-tertiary)" />
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Cryptographic Blockchain Seal · Block #{queryRes.blockchain_seal?.block_index}</span>
                       </div>
-                      <div className="hash-code" style={{ color: '#6366f1' }}>{queryRes.blockchain_seal?.block_hash}</div>
+                      <div className="hash-code" style={{ color: 'var(--accent-primary)' }}>{queryRes.blockchain_seal?.block_hash}</div>
                     </div>
                   </div>
 
-                  {/* Source Chunks */}
+                  {/* Evidence Chunks */}
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 10 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: 12 }}>
                       Retrieved Evidence Chunks ({queryRes.retrieved_chunks?.length || 0})
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
                       {(queryRes.retrieved_chunks || []).map((c, i) => (
-                        <div key={i} className="card card-p" style={{ padding: 16 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#4f46e5', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 170 }}>{c.filename}</span>
-                            <span style={{ fontSize: 10, color: '#9ca3af', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>p.{c.page_num}</span>
+                        <div key={i} className="card card-p" style={{ padding: 18 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{c.filename}</span>
+                            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>p.{c.page_num}</span>
                           </div>
-                          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#6b7280', lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.content}</p>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <span className="badge badge-indigo" style={{ fontSize: 9 }}>RRF {c.hybrid_score?.toFixed(4)}</span>
-                            {c.department && <span className="badge badge-blue" style={{ fontSize: 9 }}>{c.department}</span>}
+                          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.7, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.content}</p>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>RRF {c.hybrid_score?.toFixed(4)}</span>
+                            {c.department && <span className="badge badge-blue" style={{ fontSize: 9.5 }}>{c.department}</span>}
                           </div>
                         </div>
                       ))}
@@ -607,7 +629,7 @@ export default function App() {
 
               {/* Empty State */}
               {!queryRes && !streamText && !streaming && !querying && (
-                <EmptyState icon={Sparkles} message={<>Ask a question above, or click <strong style={{ color: '#6366f1' }}>Seed Demo Data</strong> in the top bar to populate sample HR and Technology documents for instant testing.</>} />
+                <EmptyState icon={Sparkles} message={<>Ask a question above, or click <strong style={{ color: 'var(--accent-primary)' }}>Seed Demo Data</strong> in the topbar to populate enterprise HR and Technology knowledge for immediate testing.</>} />
               )}
             </div>
           )}
@@ -616,40 +638,40 @@ export default function App() {
               KNOWLEDGE GRAPH
               ====================================================== */}
           {tab === 'graph' && (
-            <div style={{ maxWidth: 1080, margin: '0 auto' }}>
-              <PageHeader icon={Network} color="#10b981" title="Knowledge Graph Explorer"
+            <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+              <PageHeader icon={Network} color="var(--accent-success)" title="Knowledge Graph Explorer"
                 sub={`${health?.knowledge_graph?.total_nodes || 0} entities · ${health?.knowledge_graph?.total_edges || 0} semantic relationships`} />
-              <div style={{ display: 'flex', gap: 18, minHeight: 580 }}>
-                <div className="graph-wrap" ref={visRef} style={{ flex: 1 }} />
-                <div className="card card-p" style={{ width: 228, flexShrink: 0, padding: 18 }}>
+              <div style={{ display: 'flex', gap: 20, minHeight: 600, flexWrap: 'wrap' }}>
+                <div className="graph-wrap" ref={visRef} style={{ flex: '1 1 500px', minHeight: 450 }} />
+                <div className="card card-p" style={{ width: 260, flexShrink: 0, padding: 20 }}>
                   {selNode ? (
                     <div className="scale-in">
                       <span className={`badge ${({ TECHNOLOGY: 'badge-purple', ORGANIZATION: 'badge-blue', CONCEPT: 'badge-green', METRIC: 'badge-amber', PERSON: 'badge-red', LOCATION: 'badge-blue' }[selNode.type] || 'badge-slate')}`}>{selNode.type}</span>
-                      <h3 style={{ fontSize: 15, fontWeight: 800, color: '#1a1d2e', margin: '10px 0 14px', wordBreak: 'break-word' }}>{selNode.label}</h3>
-                      <div className="divider" style={{ marginBottom: 14 }} />
-                      {[['PageRank', selNode.pagerank, '#6366f1'], ['Degree', selNode.degree_centrality, '#10b981'], ['Frequency', selNode.frequency, '#f59e0b']].map(([k, v, c]) => (
-                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-light)', fontSize: 12.5 }}>
-                          <span style={{ color: '#9ca3af' }}>{k}</span>
+                      <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', margin: '12px 0 16px', wordBreak: 'break-word' }}>{selNode.label}</h3>
+                      <div className="divider" style={{ marginBottom: 16 }} />
+                      {[['PageRank', selNode.pagerank, 'var(--accent-primary)'], ['Degree', selNode.degree_centrality, 'var(--accent-success)'], ['Frequency', selNode.frequency, 'var(--accent-warning)']].map(([k, v, c]) => (
+                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 13 }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>{k}</span>
                           <span style={{ color: c, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{v}</span>
                         </div>
                       ))}
-                      <button onClick={() => setSelNode(null)} className="btn btn-ghost" style={{ width: '100%', marginTop: 14, fontSize: 12 }}>
-                        <X size={12} /> Deselect
+                      <button onClick={() => setSelNode(null)} className="btn btn-ghost" style={{ width: '100%', marginTop: 16, fontSize: 12.5 }}>
+                        <X size={14} /> Deselect
                       </button>
                     </div>
                   ) : (
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 14 }}>Entity Types</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                        {[['ORGANIZATION','#3b82f6','🏢'],['TECHNOLOGY','#7c3aed','⚡'],['CONCEPT','#10b981','💡'],['METRIC','#f59e0b','📊'],['PERSON','#ec4899','👤'],['LOCATION','#0891b2','📍']].map(([t, c, em]) => (
-                          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 7, height: 7, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                            <span style={{ fontSize: 11.5, color: '#6b7280', fontWeight: 500 }}>{em} {t}</span>
+                      <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: 16 }}>Entity Classifications</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {[['ORGANIZATION','#0284c7','🏢'],['TECHNOLOGY','#7c3aed','⚡'],['CONCEPT','#059669','💡'],['METRIC','#d97706','📊'],['PERSON','#db2777','👤'],['LOCATION','#0891b2','📍']].map(([t, c, em]) => (
+                          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0, boxShadow: `0 0 8px ${c}` }} />
+                            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>{em} {t}</span>
                           </div>
                         ))}
                       </div>
-                      <div className="divider" style={{ margin: '14px 0' }} />
-                      <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0, lineHeight: 1.6 }}>Click any node to inspect its metrics.</p>
+                      <div className="divider" style={{ margin: '16px 0' }} />
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>Click any node on the spatial canvas to inspect its centrality and metrics.</p>
                     </div>
                   )}
                 </div>
@@ -661,33 +683,33 @@ export default function App() {
               DOCUMENT LIBRARY
               ====================================================== */}
           {tab === 'documents' && (
-            <div style={{ maxWidth: 820, margin: '0 auto' }}>
-              <PageHeader icon={FileText} color="#3b82f6" title="Document Library" sub="Upload and manage enterprise knowledge sources" />
+            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+              <PageHeader icon={FileText} color="var(--accent-primary)" title="Document Library" sub="Upload and manage enterprise knowledge sources" />
 
-              <label className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '44px 24px', cursor: uploading ? 'not-allowed' : 'pointer', marginBottom: 22, borderStyle: 'dashed', borderColor: 'rgba(99,102,241,0.28)', textAlign: 'center', transition: 'all 0.2s' }}>
-                <div style={{ padding: 16, borderRadius: 16, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', marginBottom: 14 }}>
-                  <Upload size={26} color="#6366f1" />
+              <label className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 28px', cursor: uploading ? 'not-allowed' : 'pointer', marginBottom: 24, borderStyle: 'dashed', borderColor: 'var(--border-neon)', textAlign: 'center', transition: 'all 0.25s' }}>
+                <div style={{ padding: 18, borderRadius: 20, background: 'rgba(6,182,212,0.12)', border: '1px solid var(--border-neon)', marginBottom: 16, boxShadow: 'var(--glow-accent)' }}>
+                  <Upload size={28} color="var(--accent-primary)" />
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1d2e', marginBottom: 5 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6 }}>
                   {uploading ? 'Uploading document…' : 'Drop file or click to upload'}
                 </div>
-                <div style={{ fontSize: 12, color: '#9ca3af' }}>PDF · DOCX · XLSX · TXT · Markdown</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>PDF · DOCX · XLSX · TXT · Markdown</div>
                 <input type="file" onChange={doUpload} disabled={uploading} style={{ display: 'none' }} accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
               </label>
 
               {/* Ingestion Terminal */}
               {ingLogs.length > 0 && (
-                <div className="terminal slide-up" style={{ marginBottom: 22 }}>
+                <div className="terminal slide-up" style={{ marginBottom: 24 }}>
                   <div className="terminal-header">
                     <div className="terminal-dot" style={{ background: ingDone ? '#10b981' : '#f59e0b' }} />
-                    <div className="terminal-dot" style={{ background: '#374151' }} />
-                    <div className="terminal-dot" style={{ background: '#374151' }} />
-                    <span style={{ marginLeft: 4, fontSize: 11.5, fontWeight: 700, color: ingDone ? '#6ee7b7' : '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                      {ingDone ? '✓ Ingestion Complete' : '⟳ Live Ingestion Pipeline'}
+                    <div className="terminal-dot" style={{ background: '#334155' }} />
+                    <div className="terminal-dot" style={{ background: '#334155' }} />
+                    <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: ingDone ? '#6ee7b7' : 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      {ingDone ? '✓ Ingestion Complete' : '⟳ Spatial Pipeline Processing'}
                     </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: '#4b5563' }}>{ingDocId?.slice(0, 8)}…</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--text-muted)' }}>{ingDocId?.slice(0, 8)}…</span>
                   </div>
-                  <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {ingLogs.map((log, i) => (
                       <div key={i} className="terminal-line">
                         <span className="t-time">{log.timestamp?.slice(11, 19)}</span>
@@ -702,26 +724,26 @@ export default function App() {
                 </div>
               )}
 
-              {/* Doc list */}
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 10 }}>
-                Indexed Documents ({docs.length})
+              {/* Doc List */}
+              <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: 12 }}>
+                Indexed Enterprise Documents ({docs.length})
               </div>
-              {docs.length === 0 ? <EmptyState icon={Inbox} message="No documents yet. Upload a file or seed demo data." />
+              {docs.length === 0 ? <EmptyState icon={Inbox} message="No documents uploaded yet. Select a file or click Seed Demo Data in the topbar." />
                 : docs.map(doc => (
-                  <div key={doc.document_id} className="card" style={{ padding: '15px 20px', marginBottom: 9, display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: '#eff6ff', border: '1px solid rgba(59,130,246,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <FileText size={17} color="#3b82f6" />
+                  <div key={doc.document_id} className="card" style={{ padding: '18px 24px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(6,182,212,0.12)', border: '1px solid var(--border-neon)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <FileText size={20} color="var(--accent-primary)" />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1d2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</div>
-                      <div style={{ marginTop: 5, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.chunk_count} chunks</span>
-                        <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.page_count} pages</span>
-                        <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{(doc.file_size / 1024).toFixed(1)} KB</span>
-                        {doc.department && <span className="badge badge-blue" style={{ fontSize: 9.5 }}>{doc.department}</span>}
+                      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</div>
+                      <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <span className="badge badge-slate" style={{ fontSize: 10 }}>{doc.chunk_count} chunks</span>
+                        <span className="badge badge-slate" style={{ fontSize: 10 }}>{doc.page_count} pages</span>
+                        <span className="badge badge-slate" style={{ fontSize: 10 }}>{(doc.file_size / 1024).toFixed(1)} KB</span>
+                        {doc.department && <span className="badge badge-blue" style={{ fontSize: 10 }}>{doc.department}</span>}
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{new Date(doc.upload_timestamp).toLocaleDateString()}</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{new Date(doc.upload_timestamp).toLocaleDateString()}</span>
                   </div>
                 ))}
             </div>
@@ -731,29 +753,41 @@ export default function App() {
               AI VERIFIER
               ====================================================== */}
           {tab === 'verification' && (
-            <div style={{ maxWidth: 820, margin: '0 auto' }}>
-              <PageHeader icon={ShieldCheck} color="#10b981" title="Multi-Agent AI Verifier" sub="Fact-Checker Agent · Citation Auditor · Hallucination Risk Guard" />
+            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+              <PageHeader icon={ShieldCheck} color="var(--accent-success)" title="Multi-Agent AI Verifier" sub="Fact-Checker Agent · Citation Auditor · Hallucination Risk Guard" />
               {queryRes?.multi_agent_report ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 18 }}>
                     {[
-                      { icon: Shield, label: 'Trust Score', value: `${queryRes.multi_agent_report.trust_score}%`, col: '#10b981', bg: '#ecfdf5', border: 'rgba(16,185,129,0.25)' },
-                      { icon: TrendingUp, label: 'Grounding Score', value: `${queryRes.multi_agent_report.grounding_score}%`, col: '#6366f1', bg: '#eff2ff', border: 'rgba(99,102,241,0.22)' },
-                      { icon: AlertTriangle, label: 'Hallucination Risk', value: queryRes.multi_agent_report.hallucination_risk, col: queryRes.multi_agent_report.hallucination_risk === 'LOW' ? '#10b981' : '#f59e0b', bg: '#fffbeb', border: 'rgba(245,158,11,0.22)' },
+                      { icon: Shield, label: 'Trust Score', value: `${queryRes.multi_agent_report.trust_score}%`, col: 'var(--accent-success)', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)' },
+                      { icon: TrendingUp, label: 'Grounding Score', value: `${queryRes.multi_agent_report.grounding_score}%`, col: 'var(--accent-primary)', bg: 'rgba(6,182,212,0.12)', border: 'rgba(6,182,212,0.3)' },
+                      { icon: AlertTriangle, label: 'Hallucination Risk', value: queryRes.multi_agent_report.hallucination_risk, col: queryRes.multi_agent_report.hallucination_risk === 'LOW' ? 'var(--accent-success)' : 'var(--accent-warning)', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)' },
                     ].map(({ icon: I, label, value, col, bg, border }) => (
-                      <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 16, padding: 22, textAlign: 'center' }}>
-                        <I size={22} color={col} style={{ margin: '0 auto 10px', display: 'block' }} />
-                        <div style={{ fontSize: 22, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>{value}</div>
-                        <div style={{ fontSize: 11.5, color: '#9ca3af', fontWeight: 600, marginTop: 4 }}>{label}</div>
+                      <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 20, padding: 24, textAlign: 'center', backdropFilter: 'blur(20px)' }}>
+                        <I size={24} color={col} style={{ margin: '0 auto 12px', display: 'block' }} />
+                        <div style={{ fontSize: 24, fontWeight: 800, color: col, fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>{value}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700, marginTop: 6 }}>{label}</div>
                       </div>
                     ))}
                   </div>
+
                   <div className="card card-p">
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', marginBottom: 10 }}>Agent Verdict</div>
-                    <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.75, color: '#374151' }}>{queryRes.multi_agent_report.agent_verdict}</p>
+                    <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 14 }}>Fact-Checker Sentence Audit</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(queryRes.multi_agent_report.claims_verification || []).map((c, i) => (
+                        <div key={i} style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-subtle)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyBetween: 'space-between', gap: 14 }}>
+                          <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{c.claim}</span>
+                          <span className={`badge ${c.status === 'VERIFIED' ? 'badge-green' : c.status === 'PARTIAL' ? 'badge-amber' : 'badge-red'}`}>
+                            {c.status} ({c.grounding_score}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              ) : <EmptyState icon={ShieldCheck} message="Ask a question in RAG Studio to run multi-agent verification analysis." />}
+              ) : (
+                <EmptyState icon={ShieldCheck} message="Execute a query in RAG Studio to view live multi-agent verification reports and sentence audit trace." />
+              )}
             </div>
           )}
 
@@ -761,33 +795,35 @@ export default function App() {
               BLOCKCHAIN LEDGER
               ====================================================== */}
           {tab === 'blockchain' && (
-            <div style={{ maxWidth: 820, margin: '0 auto' }}>
-              <PageHeader icon={Lock} color="#7c3aed" title="Blockchain Audit Ledger" sub="SHA-256 Merkle-tree immutable tamper-proof audit trail"
-                action={<span className={`badge ${ledger?.chain_integrity?.valid ? 'badge-green' : 'badge-red'}`}>
-                  {ledger?.chain_integrity?.valid ? '✓ Chain Valid' : '✗ Tampered'}
-                </span>} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[...(ledger.blocks || [])].reverse().map((block, i) => (
-                  <div key={block.index} className="card card-p">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f5f3ff', border: '1px solid rgba(139,92,246,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Lock size={15} color="#7c3aed" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1a1d2e' }}>Block #{block.index}</span>
-                          {i === 0 && <span className="badge badge-purple" style={{ fontSize: 9 }}>Latest</span>}
-                          {block.index === 0 && <span className="badge badge-amber" style={{ fontSize: 9 }}>Genesis</span>}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{block.timestamp}</div>
-                      </div>
+            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+              <PageHeader icon={Lock} color="var(--accent-tertiary)" title="Blockchain Audit Ledger" sub="Cryptographic SHA-256 Merkle Proof of Existence & Transaction Audit" />
+              <div className="card card-p" style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Hash size={18} color="var(--accent-tertiary)" />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>SHA-256 Merkle Chain Validation</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Height: #{ledger.blocks?.length || 1} Blocks</div>
                     </div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginBottom: 4 }}>Block Hash</div>
-                    <div className="hash-code" style={{ color: '#6366f1' }}>{block.hash}</div>
-                    {block.merkle_root && <>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginTop: 12, marginBottom: 4 }}>Merkle Root</div>
-                      <div className="hash-code" style={{ color: '#10b981' }}>{block.merkle_root}</div>
-                    </>}
+                  </div>
+                  <span className={`badge ${ledger.chain_integrity?.valid ? 'badge-green' : 'badge-red'}`}>
+                    {ledger.chain_integrity?.valid ? '✓ CHAIN INTEGRITY VALID' : '❌ COMPROMISED'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {(ledger.blocks || []).map(b => (
+                  <div key={b.index} className="card card-p">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-tertiary)', fontFamily: 'var(--font-mono)' }}>BLOCK #{b.index}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{b.timestamp}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ color: 'var(--text-secondary)' }}><strong style={{ color: 'var(--text-muted)' }}>Block Hash:</strong> <span style={{ color: 'var(--accent-primary)' }}>{b.hash}</span></div>
+                      <div style={{ color: 'var(--text-secondary)' }}><strong style={{ color: 'var(--text-muted)' }}>Merkle Root:</strong> <span style={{ color: 'var(--accent-tertiary)' }}>{b.merkle_root}</span></div>
+                      <div style={{ color: 'var(--text-secondary)' }}><strong style={{ color: 'var(--text-muted)' }}>Prev Hash:</strong> <span style={{ color: 'var(--text-muted)' }}>{b.previous_hash}</span></div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -795,144 +831,32 @@ export default function App() {
           )}
 
           {/* ======================================================
-              COMPONENT TELEMETRY
+              SYSTEM TELEMETRY
               ====================================================== */}
           {tab === 'telemetry' && (
-            <div style={{ maxWidth: 980, margin: '0 auto' }}>
-              <PageHeader icon={Terminal} color="#6366f1" title="Component Telemetry & Live Logs" sub="Real-time metrics for all platform subsystems"
-                action={<button onClick={async () => { const d = await api.get('/api/system/telemetry'); if (d?.qdrant_vector_store) setTelemetry(d); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}><RefreshCw size={13} /> Refresh</button>} />
-              {telemetry ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(400px,1fr))', gap: 18 }}>
-                  {/* Qdrant */}
-                  <div className="telemetry-card" style={{ borderTop: '3px solid #6366f1' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ padding: 9, borderRadius: 11, background: '#eff2ff', border: '1px solid rgba(99,102,241,0.22)' }}>
-                          <Database size={16} color="#6366f1" />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Qdrant Vector Store</div>
-                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>all-MiniLM-L6-v2 · {telemetry.qdrant_vector_store?.vector_dimension}D Cosine</div>
-                        </div>
-                      </div>
-                      <span className="badge badge-indigo">Operational</span>
+            <div style={{ maxWidth: 900, margin: '0 auto' }}>
+              <PageHeader icon={Terminal} color="var(--accent-primary)" title="System Telemetry" sub="Live diagnostic logs across vector, graph, keyword, and blockchain layers" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 18 }}>
+                {[
+                  { title: 'Qdrant Vector Store', icon: Database, data: telemetry?.qdrant_vector_store },
+                  { title: 'Knowledge Graph Engine', icon: Network, data: telemetry?.knowledge_graph },
+                  { title: 'BM25 Keyword Index', icon: Search, data: telemetry?.bm25_keyword_store },
+                  { title: 'Blockchain Audit Ledger', icon: Lock, data: telemetry?.blockchain_audit_ledger },
+                ].map(({ title, icon: I, data }) => (
+                  <div key={title} className="telemetry-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                      <I size={18} color="var(--accent-primary)" />
+                      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{title}</h3>
                     </div>
-                    {[['Storage Mode', telemetry.qdrant_vector_store?.storage_mode], ['Collection', 'enterprise_chunks'], ['Indexed Chunks', telemetry.qdrant_vector_store?.indexed_chunks], ['Distance Metric', telemetry.qdrant_vector_store?.distance_metric]].map(([k, v]) => (
+                    {data ? Object.entries(data).map(([k, v]) => (
                       <div key={k} className="telemetry-row">
-                        <span className="telemetry-key">{k}</span>
-                        <span className="telemetry-val" style={{ color: '#6366f1' }}>{v}</span>
+                        <span className="telemetry-key">{k.replace(/_/g, ' ')}</span>
+                        <span className="telemetry-val">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
                       </div>
-                    ))}
+                    )) : <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Fetching telemetry diagnostics…</p>}
                   </div>
-
-                  {/* KG */}
-                  <div className="telemetry-card" style={{ borderTop: '3px solid #10b981' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ padding: 9, borderRadius: 11, background: '#ecfdf5', border: '1px solid rgba(16,185,129,0.22)' }}>
-                          <Network size={16} color="#10b981" />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Knowledge Graph</div>
-                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>NetworkX · JSON Persistence</div>
-                        </div>
-                      </div>
-                      <span className="badge badge-green">Active</span>
-                    </div>
-                    {[['Total Nodes', telemetry.knowledge_graph?.total_nodes], ['Total Edges', telemetry.knowledge_graph?.total_edges], ['Graph Density', telemetry.knowledge_graph?.graph_density]].map(([k, v]) => (
-                      <div key={k} className="telemetry-row">
-                        <span className="telemetry-key">{k}</span>
-                        <span className="telemetry-val" style={{ color: '#10b981' }}>{v}</span>
-                      </div>
-                    ))}
-                    {telemetry.knowledge_graph?.top_pagerank_entities?.length > 0 && <>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginTop: 12, marginBottom: 8 }}>Top PageRank</div>
-                      {telemetry.knowledge_graph.top_pagerank_entities.map((e, i) => (
-                        <div key={i} className="telemetry-row">
-                          <span className="telemetry-key">{e.label}</span>
-                          <span className="telemetry-val" style={{ color: '#10b981' }}>{e.pagerank}</span>
-                        </div>
-                      ))}
-                    </>}
-                  </div>
-
-                  {/* Blockchain */}
-                  <div className="telemetry-card" style={{ borderTop: '3px solid #7c3aed' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ padding: 9, borderRadius: 11, background: '#f5f3ff', border: '1px solid rgba(139,92,246,0.22)' }}>
-                          <Lock size={16} color="#7c3aed" />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Blockchain Ledger</div>
-                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>SHA-256 · Merkle Tree</div>
-                        </div>
-                      </div>
-                      <span className="badge badge-purple">Sealed</span>
-                    </div>
-                    {[['Block Height', `#${telemetry.blockchain_audit_ledger?.block_height}`], ['Status', telemetry.blockchain_audit_ledger?.status], ['Audit Events', telemetry.blockchain_audit_ledger?.total_audit_events]].map(([k, v]) => (
-                      <div key={k} className="telemetry-row">
-                        <span className="telemetry-key">{k}</span>
-                        <span className="telemetry-val" style={{ color: '#7c3aed' }}>{v}</span>
-                      </div>
-                    ))}
-                    <div style={{ marginTop: 10 }}>
-                      <div style={{ fontSize: 10.5, color: '#9ca3af', marginBottom: 4 }}>Merkle Root</div>
-                      <div className="hash-code" style={{ color: '#7c3aed' }}>{telemetry.blockchain_audit_ledger?.merkle_root?.slice(0, 32)}…</div>
-                    </div>
-                  </div>
-
-                  {/* BM25 */}
-                  <div className="telemetry-card" style={{ borderTop: '3px solid #f59e0b' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ padding: 9, borderRadius: 11, background: '#fffbeb', border: '1px solid rgba(245,158,11,0.22)' }}>
-                          <FileCode size={16} color="#f59e0b" />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>BM25 Keyword Engine</div>
-                          <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>Custom BM25 · Pickle Persistence</div>
-                        </div>
-                      </div>
-                      <span className="badge badge-amber">Ready</span>
-                    </div>
-                    {[['Engine', telemetry.bm25_keyword_store?.engine], ['Indexed Docs', telemetry.bm25_keyword_store?.indexed_documents], ['Vocabulary Size', telemetry.bm25_keyword_store?.vocabulary_size], ['Avg Doc Length', telemetry.bm25_keyword_store?.avg_doc_length]].map(([k, v]) => (
-                      <div key={k} className="telemetry-row">
-                        <span className="telemetry-key">{k}</span>
-                        <span className="telemetry-val" style={{ color: '#b45309' }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Verifier — full width */}
-                  <div className="telemetry-card" style={{ borderTop: '3px solid #10b981', gridColumn: 'span 2' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                      <div style={{ padding: 9, borderRadius: 11, background: '#ecfdf5', border: '1px solid rgba(16,185,129,0.22)' }}>
-                        <ShieldCheck size={16} color="#10b981" />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1d2e' }}>Multi-Agent Verification Pipeline</div>
-                        <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>3 cooperative agents · Real-time grounding analysis</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 14 }}>
-                      {(telemetry.multi_agent_verifier?.agents || []).map((a, i) => (
-                        <div key={i} style={{ flex: 1, padding: 16, background: '#ecfdf5', borderRadius: 12, border: '1px solid rgba(16,185,129,0.18)', textAlign: 'center' }}>
-                          <CheckCircle2 size={18} color="#10b981" style={{ margin: '0 auto 8px', display: 'block' }} />
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{a}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: 14, padding: '10px 14px', background: '#f8f9ff', borderRadius: 9, fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#6b7280' }}>
-                      Formula: <span style={{ color: '#6366f1', fontWeight: 700 }}>{telemetry.multi_agent_verifier?.trust_formula}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 18 }}>
-                  {[0,1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 220 }} />)}
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           )}
 
@@ -940,26 +864,17 @@ export default function App() {
               CHAT HISTORY
               ====================================================== */}
           {tab === 'history' && (
-            <div style={{ maxWidth: 820, margin: '0 auto' }}>
-              <PageHeader icon={Clock} color="#f59e0b" title="Chat History" sub={`${history.length} past queries`}
-                action={<button onClick={async () => { const d = await api.get('/api/history'); if (Array.isArray(d)) setHistory(d); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}><RefreshCw size={13} /> Refresh</button>} />
-              {history.length === 0 ? <EmptyState icon={Clock} message="No query history yet. Ask a question in RAG Studio." />
-                : history.map((item, i) => (
-                  <div key={item.id || i} className="card card-p" style={{ marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10 }}>
-                      <div style={{ display: 'flex', gap: 10 }}>
-                        <div style={{ padding: 8, borderRadius: 9, background: '#eff2ff', border: '1px solid rgba(99,102,241,0.18)', flexShrink: 0 }}>
-                          <Search size={13} color="#6366f1" />
-                        </div>
-                        <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: '#1a1d2e', lineHeight: 1.5 }}>{item.query}</p>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        <RiskBadge risk={item.hallucination_risk} />
-                        <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>{item.trust_score}% trust</span>
-                      </div>
+            <div style={{ maxWidth: 840, margin: '0 auto' }}>
+              <PageHeader icon={Clock} color="var(--accent-tertiary)" title="Chat History" sub="Past user queries, trust scores, and execution latency logs" />
+              {history.length === 0 ? <EmptyState icon={Clock} message="No previous conversation history found." />
+                : history.map(h => (
+                  <div key={h.id} className="card card-p" style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>{h.query}</span>
+                      <span className="badge badge-indigo" style={{ fontSize: 10 }}>Trust {h.trust_score}%</span>
                     </div>
-                    <p style={{ margin: '0 0 10px', fontSize: 12.5, color: '#6b7280', lineHeight: 1.7 }}>{item.answer}</p>
-                    <div style={{ fontSize: 10.5, color: '#9ca3af', fontFamily: 'var(--font-mono)' }}>{new Date(item.timestamp).toLocaleString()}</div>
+                    <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{h.answer}</p>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{new Date(h.timestamp).toLocaleString()}</div>
                   </div>
                 ))}
             </div>
@@ -967,6 +882,7 @@ export default function App() {
 
         </main>
       </div>
+
     </div>
   );
 }
