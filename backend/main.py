@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional
 from fastapi import (
     FastAPI, File, UploadFile, HTTPException, Depends,
-    BackgroundTasks, status, Form
+    BackgroundTasks, status, Form, Request
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -18,6 +18,7 @@ from sqlalchemy import select
 from config import config
 from db.database import get_db, init_db
 from db.models import User, Document, ChatHistory, QueryLog
+from fastapi.security import OAuth2PasswordRequestForm
 from auth.auth import (
     UserRegisterRequest, UserLoginRequest, TokenResponse, UserProfile,
     hash_password, verify_password, create_access_token,
@@ -223,21 +224,54 @@ async def register(req: UserRegisterRequest, db: AsyncSession = Depends(get_db))
 
 
 @app.post("/auth/login", response_model=TokenResponse)
-async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == req.username))
+async def login(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    username = None
+    password = None
+
+    # Check content-type header to support both JSON body and Form data
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            username = data.get("username")
+            password = data.get("password")
+        except Exception:
+            pass
+
+    if not username or not password:
+        try:
+            form = await request.form()
+            username = form.get("username")
+            password = form.get("password")
+        except Exception:
+            pass
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username and password are required."
+        )
+
+    result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(req.password, user.hashed_password):
+    if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password."
+            detail="Invalid username or password.",
+            headers={"WWW-Authenticate": "Bearer"}
         )
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is disabled.")
 
-    token = create_access_token({"sub": str(user.id)})
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled.")
+
+    token = create_access_token({"sub": str(user.id), "username": user.username, "role": user.role})
     return TokenResponse(
         access_token=token,
+        token_type="bearer",
         user_id=user.id,
         username=user.username,
         role=user.role,
@@ -420,11 +454,9 @@ async def execute_hybrid_query(
     user_id = current_user.id if current_user else None
     start_time = time.time()
 
-    if vector_store.get_chunk_count() == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="No documents indexed. Please upload enterprise documents first or click Seed Demo Data."
-        )
+    if vector_store.get_chunk_count() == 0 and keyword_store.doc_count == 0:
+        print("[Query] Vector store empty. Auto-seeding enterprise demo data...")
+        seed_demo_data()
 
     try:
         weights = {"v": req.vector_weight, "k": req.keyword_weight, "g": req.graph_weight}
@@ -528,9 +560,9 @@ async def stream_query(
     req: QueryRequest,
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    """Server-Sent Events endpoint for streaming LLM responses."""
-    if vector_store.get_chunk_count() == 0:
-        raise HTTPException(status_code=400, detail="No documents indexed. Please upload enterprise documents first or click Seed Demo Data.")
+    if vector_store.get_chunk_count() == 0 and keyword_store.doc_count == 0:
+        print("[StreamQuery] Vector store empty. Auto-seeding enterprise demo data...")
+        seed_demo_data()
 
     retrieval_result = hybrid_engine.retrieve(
         query=req.query,
