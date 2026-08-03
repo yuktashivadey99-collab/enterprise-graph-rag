@@ -4,6 +4,7 @@ import os
 # Add backend directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from auth.auth import hash_password, verify_password, create_access_token, decode_token
 from ingestion.document_processor import DocumentProcessor
 from ingestion.chunker import TextChunker
 from embeddings.vector_store import VectorStore
@@ -14,8 +15,19 @@ from verification.multi_agent import MultiAgentVerificationPipeline
 from blockchain.ledger import BlockchainAuditLedger
 
 def test_pipeline():
-    print("=== Testing Enterprise Graph-RAG Pipeline ===")
+    print("=== Testing Enterprise Graph-RAG End-to-End Pipeline ===")
     
+    # 0. Test Security & Auth Module
+    raw_pwd = "EnterpriseSecurePassword2026!"
+    hashed = hash_password(raw_pwd)
+    assert verify_password(raw_pwd, hashed), "Password verification failed!"
+    assert not verify_password("WrongPassword", hashed), "Password false positive!"
+    
+    token = create_access_token({"sub": "1", "username": "admin", "role": "admin"})
+    payload = decode_token(token)
+    assert payload.get("sub") == "1", "Token payload decoding failed!"
+    print(f"[OK] Auth & Security Engine: PBKDF2-HMAC-SHA256 password hashing & JWT token verification passed.")
+
     # 1. Initialize Components
     doc_proc = DocumentProcessor()
     chunker = TextChunker(chunk_size=400, overlap=50)
