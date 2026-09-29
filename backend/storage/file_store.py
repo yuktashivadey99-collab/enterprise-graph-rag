@@ -26,7 +26,7 @@ class LocalFileStore:
         file_path.write_bytes(content)
 
         relative_path = str(file_path.relative_to(self.base_dir))
-        print(f"[FileStore] Saved '{filename}' → '{file_path}' ({len(content)} bytes)")
+        print(f"[FileStore] Saved '{filename}' -> '{file_path}' ({len(content)} bytes)")
         return relative_path
 
     def get_file(self, document_id: str, filename: str) -> Optional[bytes]:
