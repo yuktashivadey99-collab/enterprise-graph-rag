@@ -662,6 +662,40 @@ def get_blockchain_ledger():
     }
 
 
+@app.get("/api/verify-audit")
+def verify_audit_integrity():
+    """Re-verify the full blockchain audit chain integrity on demand."""
+    result = blockchain_ledger.verify_chain_integrity()
+    return {
+        "verified": result["valid"],
+        "chain_length": result.get("chain_length", len(blockchain_ledger.chain)),
+        "latest_block_hash": result.get("latest_block_hash", ""),
+        "merkle_root": result.get("merkle_root", ""),
+        "status": "TAMPER_PROOF" if result["valid"] else "COMPROMISED",
+        "message": "All block hashes and Merkle roots verified successfully." if result["valid"]
+                   else result.get("reason", "Chain integrity check failed.")
+    }
+
+
+@app.get("/api/analytics")
+async def get_analytics(db: AsyncSession = Depends(get_db)):
+    """Return aggregate analytics for dashboard stats."""
+    from sqlalchemy import func
+    query_count = await db.execute(select(func.count()).select_from(QueryLog))
+    doc_count = await db.execute(select(func.count()).select_from(Document))
+    avg_trust = await db.execute(select(func.avg(QueryLog.trust_score)).select_from(QueryLog))
+    avg_latency = await db.execute(select(func.avg(QueryLog.latency_ms)).select_from(QueryLog))
+    return {
+        "total_queries": query_count.scalar() or 0,
+        "total_documents": doc_count.scalar() or 0,
+        "avg_trust_score": round(avg_trust.scalar() or 0.0, 1),
+        "avg_latency_ms": round(avg_latency.scalar() or 0.0, 1),
+        "graph_nodes": len(graph_engine.graph.nodes),
+        "graph_edges": len(graph_engine.graph.edges),
+        "blockchain_blocks": len(blockchain_ledger.chain),
+    }
+
+
 # ==============================================================================
 # DEMO SEED ROUTE
 # ==============================================================================
