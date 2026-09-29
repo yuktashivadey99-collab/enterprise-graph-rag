@@ -43,7 +43,30 @@ async def get_db():
 
 
 def init_db():
-    """Create all tables synchronously at startup."""
+    """Create all tables synchronously at startup and seed default admin user."""
     from db.models import User, Document, ChatHistory, QueryLog  # noqa: F401
+    from auth.auth import hash_password
+    from sqlalchemy.orm import Session
+
     Base.metadata.create_all(bind=sync_engine)
+
+    try:
+        with Session(sync_engine) as session:
+            admin = session.query(User).filter_by(username="admin").first()
+            if not admin:
+                default_admin = User(
+                    username="admin",
+                    email="admin@enterprise.ai",
+                    hashed_password=hash_password("admin123"),
+                    full_name="Enterprise Administrator",
+                    department="Technology",
+                    role="admin",
+                    is_active=True
+                )
+                session.add(default_admin)
+                session.commit()
+                print("[DB] Default admin user seeded: username='admin', password='admin123'")
+    except Exception as e:
+        print(f"[DB] Notice on admin seeding: {e}")
+
     print("[DB] SQLite database initialized successfully.")
