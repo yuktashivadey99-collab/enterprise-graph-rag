@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
-    Filter, FieldCondition, MatchValue, SearchRequest
+    Filter, FieldCondition, MatchValue
 )
 import uuid
 
