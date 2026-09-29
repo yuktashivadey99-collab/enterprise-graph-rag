@@ -15,7 +15,7 @@ class AppConfig(BaseSettings):
 
     # ---- Google Gemini ----
     GOOGLE_API_KEY: str = Field(default="", env="GOOGLE_API_KEY")
-    GEMINI_MODEL: str = Field(default="gemini-2.0-flash", env="GEMINI_MODEL")
+    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", env="GEMINI_MODEL")
     GEMINI_MAX_TOKENS: int = Field(default=2048, env="GEMINI_MAX_TOKENS")
     GEMINI_TEMPERATURE: float = Field(default=0.3, env="GEMINI_TEMPERATURE")
 
