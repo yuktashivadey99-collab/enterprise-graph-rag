@@ -601,7 +601,8 @@ async def stream_query(
             "type": "done",
             "trust_score": verification_report["trust_score"],
             "hallucination_risk": verification_report["hallucination_risk"],
-            "agent_verdict": verification_report["agent_verdict"]
+            "agent_verdict": verification_report["agent_verdict"],
+            "triples_summary": graph_ctx.get("triples_summary", [])
         }
         yield f"data: {json.dumps(done_payload)}\n\n"
 
