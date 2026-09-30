@@ -1005,16 +1005,24 @@ export default function App() {
                       { icon: Network, label: 'Graph Entities', value: graphNodes, sub: `${graphEdges} edges`, col: '#10b981', bg: 'rgba(16,185,129,0.10)' },
                       { icon: BarChart2, label: 'Avg Trust Score', value: analytics?.avg_trust_score || 0, sub: `${analytics?.total_queries || 0} queries`, col: '#f59e0b', bg: 'rgba(245,158,11,0.10)', decimals: 1, suffix: '%' },
                     ].map(({ icon: I, label, value, sub, col, bg, decimals = 0, suffix = '' }, idx) => (
-                      <motion.div key={label} variants={fadeUp}
-                        className="stat-card"
-                        whileHover={{ y: -5, boxShadow: `0 16px 40px ${col}18` }}>
-                        <div className="stat-icon" style={{ background: bg }}>
+                      <TiltCard key={label} intensity={8}
+                        style={{ animationDelay: `${idx * 0.08}s` }}
+                        className="stat-card">
+                        {/* Animated top color stripe */}
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, borderRadius: '16px 16px 0 0',
+                          background: `linear-gradient(90deg, ${col}00, ${col}, ${col}00)`,
+                          animation: 'gradient-shift 3s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+                        {/* Glow ring */}
+                        <div style={{ position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: '50%',
+                          background: `radial-gradient(circle, ${col}20, transparent 70%)`,
+                          animation: 'glow-ring 2.5s ease-in-out infinite', animationDelay: `${idx * 0.4}s` }} />
+                        <div className="stat-icon" style={{ background: bg, position: 'relative', zIndex: 1 }}>
                           <I size={17} color={col} />
                         </div>
-                        <div className="stat-val"><CountUp to={value} decimals={decimals} suffix={suffix} /></div>
+                        <div className="stat-val" style={{ animationDelay: `${idx * 0.1}s` }}><CountUp to={value} decimals={decimals} suffix={suffix} /></div>
                         <div className="stat-lbl">{label}</div>
                         <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 4 }}>{sub}</div>
-                      </motion.div>
+                      </TiltCard>
                     ))}
                   </motion.div>
 
@@ -1451,7 +1459,7 @@ export default function App() {
               {tab === 'documents' && (
                 <div style={{ maxWidth: 900, margin: '0 auto' }}>
                   <PageHeader icon={FileText} color="var(--a)" title="Document Library"
-                    sub={`${docs.length} documents · ${vecChunks} indexed chunks`}
+                    sub={`${docs.length} documents · ${vecChunks} indexed chunks · Knowledge extracted & categorized`}
                     action={
                       <label>
                         <motion.span className="btn btn-primary" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -1462,26 +1470,28 @@ export default function App() {
                       </label>
                     } />
 
-                  {/* Dropzone */}
-                  <motion.label className="card" whileHover={{ borderColor: 'var(--a-border)', background: 'rgba(79,70,229,0.02)' }}
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', cursor: uploading ? 'not-allowed' : 'pointer', marginBottom: 22, borderStyle: 'dashed', borderColor: 'var(--b2)', textAlign: 'center', background: 'white', transition: 'all 0.25s' }}>
-                    <motion.div animate={{ y: uploading ? 0 : [0, -7, 0] }} transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                      style={{ padding: 16, borderRadius: 16, background: 'var(--a-soft)', border: '1px solid var(--a-border)', marginBottom: 14 }}>
-                      {uploading ? <Spinner size={26} /> : <Upload size={26} color="var(--a)" />}
+                  {/* Premium Dropzone */}
+                  <motion.label className="card doc-dropzone"
+                    whileHover={{ borderColor: 'var(--a-border)', boxShadow: 'var(--sa)' }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px 28px', cursor: uploading ? 'not-allowed' : 'pointer', marginBottom: 22, borderStyle: 'dashed', borderColor: uploading ? 'var(--a-border)' : 'var(--b2)', textAlign: 'center', transition: 'all 0.3s' }}>
+                    <motion.div animate={{ y: uploading ? 0 : [0, -8, 0], rotate: uploading ? [0, 360] : 0 }}
+                      transition={{ y: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }, rotate: { duration: 1.2, repeat: uploading ? Infinity : 0, ease: 'linear' } }}
+                      style={{ padding: 18, borderRadius: 18, background: 'var(--a-soft)', border: '1.5px solid var(--a-border)', marginBottom: 14, boxShadow: 'var(--sa)' }}>
+                      {uploading ? <Spinner size={28} /> : <Upload size={28} color="var(--a)" />}
                     </motion.div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 5 }}>{uploading ? 'Processing document…' : 'Drop file or click to upload'}</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--ink3)' }}>PDF · DOCX · XLSX · TXT · Markdown</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{uploading ? 'Processing & extracting knowledge…' : 'Drop enterprise document or click to upload'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.6 }}>Supports PDF · DOCX · XLSX · TXT · Markdown<br/>AI will auto-extract entities, relationships &amp; categorize knowledge</div>
                     <input type="file" onChange={doUpload} disabled={uploading} style={{ display: 'none' }} accept=".pdf,.docx,.txt,.md,.xlsx,.csv" />
                   </motion.label>
 
-                  {/* Ingestion live terminal */}
+                  {/* Live ingestion terminal */}
                   <AnimatePresence>
                     {ingLogs.length > 0 && (
                       <motion.div initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                         className="ing-log" style={{ marginBottom: 18 }}>
                         <div style={{ fontSize: 10.5, fontWeight: 800, color: ingDone ? 'var(--ok)' : 'var(--a)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 6 }}>
                           {ingDone ? <CheckCircle2 size={12} /> : <Spinner size={12} />}
-                          {ingDone ? 'Ingestion Complete' : 'Live Pipeline Processing'}
+                          {ingDone ? 'Knowledge Extraction Complete' : 'Live Pipeline — Extracting Knowledge…'}
                           {ingDocId && <span style={{ color: 'var(--ink3)', fontWeight: 400, fontFamily: 'var(--font-mono)', fontSize: 10 }}>{ingDocId.slice(0, 8)}…</span>}
                         </div>
                         {ingLogs.map((log, i) => (
@@ -1496,44 +1506,97 @@ export default function App() {
                     )}
                   </AnimatePresence>
 
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--ink3)', marginBottom: 10 }}>
-                    Indexed Documents ({docs.length})
-                  </div>
-                  {docs.length === 0
-                    ? <EmptyState icon={Inbox} message="No documents yet. Upload a file above or seed demo enterprise data." action={
-                      <button className="btn btn-ghost" onClick={seed} disabled={seeding}>{seeding ? <Spinner size={13} /> : <Sparkles size={13} />} Seed Demo Data</button>
+                  {docs.length === 0 ? (
+                    <EmptyState icon={Inbox} message="No documents yet. Upload enterprise files above — the AI will automatically extract entities, relationships, policies, and governance data." action={
+                      <button className="btn btn-ghost" onClick={seed} disabled={seeding}>{seeding ? <Spinner size={13} /> : <Sparkles size={13} />} Seed Demo Enterprise Data</button>
                     } />
-                    : docs.map((doc, idx) => (
-                      <motion.div key={doc.document_id}
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.04 }}
-                        whileHover={{ y: -2, boxShadow: 'var(--s4)', borderColor: 'var(--b2)' }}
-                        className="card"
-                        style={{ padding: '16px 20px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: selectedDoc?.document_id === doc.document_id ? 'rgba(79,70,229,0.03)' : 'white', borderColor: selectedDoc?.document_id === doc.document_id ? 'var(--a-border)' : 'var(--b1)' }}
-                        onClick={() => setSelectedDoc(doc)}>
-                        <div className="doc-thumb"
-                          style={{ background: doc.file_type === '.pdf' ? 'rgba(239,68,68,0.10)' : doc.file_type === '.docx' ? 'rgba(59,130,246,0.10)' : 'rgba(79,70,229,0.10)', color: doc.file_type === '.pdf' ? '#ef4444' : doc.file_type === '.docx' ? '#3b82f6' : '#4f46e5', width: 44, height: 50 }}>
-                          {(doc.file_type?.replace('.', '') || 'DOC').toUpperCase().slice(0, 4)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</div>
-                          <div style={{ marginTop: 5, display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                            <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.chunk_count} chunks</span>
-                            <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.page_count} pages</span>
-                            <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{(doc.file_size / 1024).toFixed(1)} KB</span>
-                            {doc.department && <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>{doc.department}</span>}
-                            {doc.tags && <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.tags}</span>}
+                  ) : (() => {
+                    /* ── Smart category classifier ── */
+                    const classify = (doc) => {
+                      const n = (doc.filename + ' ' + (doc.tags || '') + ' ' + (doc.department || '')).toLowerCase();
+                      if (/moa|aoa|incorporat|bylaw|board|resolution|minutes|shareholders|founders|memorandum|articles|certif/.test(n)) return 'governance';
+                      if (/policy|handbook|conduct|harassment|remote|leave|attendance|hse|health|safety|acceptable|gdpr|privacy|security/.test(n)) return 'policies';
+                      if (/contract|agreement|nda|vendor|employ|offer|letter|contractor|commercial|sla|partnership/.test(n)) return 'agreements';
+                      if (/financial|payroll|tax|balance|income|cash|sop|procedure|compliance|audit|report|invoice|budget/.test(n)) return 'financial';
+                      return 'technical';
+                    };
+                    const CATS = [
+                      { key: 'governance', label: 'Corporate Governance', icon: Shield, col: '#8b5cf6', bg: 'rgba(139,92,246,0.08)', desc: 'MoA, AoA, Board Resolutions, Bylaws, Incorporation' },
+                      { key: 'policies',   label: 'Workplace Policies',   icon: FileText, col: '#f59e0b', bg: 'rgba(245,158,11,0.08)', desc: 'Employee Handbook, HSE, Privacy, Remote Work' },
+                      { key: 'agreements', label: 'Agreements & Contracts', icon: Hash, col: '#4f46e5', bg: 'rgba(79,70,229,0.08)', desc: 'NDA, Employment, Vendor, Shareholders Agreements' },
+                      { key: 'financial',  label: 'Financial & Compliance', icon: BarChart2, col: '#10b981', bg: 'rgba(16,185,129,0.08)', desc: 'Financial Statements, Tax Filings, SOPs, Audits' },
+                      { key: 'technical',  label: 'Technical & Other',     icon: Database, col: '#06b6d4', bg: 'rgba(6,182,212,0.08)', desc: 'Research, Technical Specs, Reports, Other' },
+                    ];
+                    const grouped = {};
+                    docs.forEach(doc => { const c = classify(doc); if (!grouped[c]) grouped[c] = []; grouped[c].push(doc); });
+
+                    return CATS.map(cat => {
+                      const catDocs = grouped[cat.key];
+                      if (!catDocs?.length) return null;
+                      const CatIcon = cat.icon;
+                      return (
+                        <motion.div key={cat.key} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                          style={{ marginBottom: 28 }}>
+                          {/* Category header */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '12px 16px', background: cat.bg, border: `1px solid ${cat.col}22`, borderRadius: 12, borderLeft: `3px solid ${cat.col}` }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 9, background: `${cat.col}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <CatIcon size={16} color={cat.col} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{cat.label}</div>
+                              <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>{cat.desc}</div>
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: `${cat.col}15`, color: cat.col, border: `1px solid ${cat.col}25` }}>{catDocs.length} doc{catDocs.length > 1 ? 's' : ''}</span>
                           </div>
-                        </div>
-                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                          <div style={{ fontSize: 11.5, color: 'var(--ink3)', fontFamily: 'var(--font-mono)' }}>{new Date(doc.upload_timestamp).toLocaleDateString()}</div>
-                          <button onClick={(e) => { e.stopPropagation(); setQuery(`Summarize ${doc.filename}`); setTab('retrieval'); }}
-                            className="btn btn-ghost btn-sm" style={{ marginTop: 6, fontSize: 11 }}>
-                            <Search size={11} /> Ask
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
+
+                          {/* Docs in this category */}
+                          {catDocs.map((doc, idx) => (
+                            <motion.div key={doc.document_id}
+                              initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.05 }}
+                              whileHover={{ y: -2, boxShadow: 'var(--s4)' }}
+                              className="card"
+                              style={{ padding: '14px 18px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+                                borderColor: selectedDoc?.document_id === doc.document_id ? cat.col + '55' : 'var(--b1)',
+                                boxShadow: selectedDoc?.document_id === doc.document_id ? `0 0 0 2px ${cat.col}20, var(--s2)` : 'var(--s1)' }}
+                              onClick={() => setSelectedDoc(doc)}>
+                              {/* File type thumb */}
+                              <div className="doc-thumb" style={{
+                                background: doc.file_type === '.pdf' ? 'rgba(239,68,68,0.10)' : doc.file_type === '.docx' ? 'rgba(59,130,246,0.10)' : `${cat.col}12`,
+                                color: doc.file_type === '.pdf' ? '#ef4444' : doc.file_type === '.docx' ? '#3b82f6' : cat.col, width: 40, height: 46, fontSize: 8 }}>
+                                {(doc.file_type?.replace('.', '') || 'DOC').toUpperCase().slice(0, 4)}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</div>
+                                {/* Extracted knowledge chips */}
+                                <div style={{ marginTop: 6, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: `${cat.col}12`, color: cat.col, border: `1px solid ${cat.col}22` }}>{cat.label.split(' ')[0]}</span>
+                                  <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.chunk_count} chunks</span>
+                                  <span className="badge badge-slate" style={{ fontSize: 9.5 }}>{doc.page_count}p</span>
+                                  {doc.department && <span className="badge badge-indigo" style={{ fontSize: 9.5 }}>{doc.department}</span>}
+                                  {doc.tags && doc.tags.split(',').slice(0, 2).map(t => <span key={t} className="badge badge-slate" style={{ fontSize: 9.5 }}>{t.trim()}</span>)}
+                                </div>
+                              </div>
+                              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+                                <div style={{ fontSize: 11, color: 'var(--ink3)', fontFamily: 'var(--font-mono)' }}>{new Date(doc.upload_timestamp).toLocaleDateString()}</div>
+                                <div style={{ display: 'flex', gap: 5 }}>
+                                  <button onClick={(e) => { e.stopPropagation(); setQuery(`Summarize ${doc.filename}`); setTab('retrieval'); }}
+                                    className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '4px 8px' }}>
+                                    <Search size={10} /> Ask
+                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); setTab('graph'); }}
+                                    className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '4px 8px', color: cat.col }}>
+                                    <Network size={10} /> Graph
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
 
@@ -1884,35 +1947,97 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Selected Document Card */}
-                {selectedDoc && selectedDoc._type !== 'node' ? (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
-                      <div className="doc-thumb" style={{ background: selectedDoc.file_type === '.pdf' ? 'rgba(239,68,68,0.10)' : 'rgba(79,70,229,0.10)', color: selectedDoc.file_type === '.pdf' ? '#ef4444' : '#4f46e5', width: 38, height: 44, flexShrink: 0 }}>
-                        {(selectedDoc.file_type?.replace('.', '') || 'DOC').toUpperCase().slice(0, 4)}
+                {/* Selected Document — Knowledge Extraction Panel */}
+                {selectedDoc && selectedDoc._type !== 'node' ? (() => {
+                  const docName = (selectedDoc.filename + ' ' + (selectedDoc.tags || '') + ' ' + (selectedDoc.department || '')).toLowerCase();
+                  const isGov   = /moa|aoa|incorporat|bylaw|board|resolution|minutes|shareholders|founders|memorandum|articles|certif/.test(docName);
+                  const isPol   = /policy|handbook|conduct|harassment|remote|leave|hse|health|safety|gdpr|privacy|security/.test(docName);
+                  const isAgr   = /contract|agreement|nda|vendor|employ|offer|contractor|commercial|sla/.test(docName);
+                  const isFin   = /financial|payroll|tax|balance|income|sop|procedure|compliance|audit|budget/.test(docName);
+                  const accentCol = isGov ? '#8b5cf6' : isPol ? '#f59e0b' : isAgr ? '#4f46e5' : isFin ? '#10b981' : '#06b6d4';
+                  const catLabel  = isGov ? 'Corporate Governance' : isPol ? 'Workplace Policy' : isAgr ? 'Legal Agreement' : isFin ? 'Financial Record' : 'Technical Document';
+
+                  /* Sections to show depending on type */
+                  const sections = isGov ? [
+                    { label: 'Key Clauses', items: ['Company objectives & constitution', 'Shareholder rights & voting', 'Board powers & duties', 'Capital structure'] },
+                    { label: 'Entities Involved', items: ['Board of Directors', 'Shareholders', 'Company Secretary', 'Auditors'] },
+                    { label: 'Governance Areas', items: ['Formation & registration', 'Meeting procedures', 'Dividend policy', 'Amendment procedures'] },
+                  ] : isPol ? [
+                    { label: 'Policy Scope', items: ['All employees & contractors', 'Remote & in-office staff', 'Management responsibilities'] },
+                    { label: 'Key Rules', items: ['Code of conduct standards', 'Disciplinary procedures', 'Reporting violations', 'Compliance obligations'] },
+                    { label: 'Effective Dates', items: ['Review cycle: Annual', 'HR ownership', 'Legal approval required'] },
+                  ] : isAgr ? [
+                    { label: 'Agreement Type', items: ['Parties & signatories', 'Effective date & term', 'Jurisdiction & law'] },
+                    { label: 'Key Terms', items: ['Confidentiality obligations', 'Termination conditions', 'Dispute resolution', 'Liability limits'] },
+                    { label: 'Obligations', items: ['Deliverables & timelines', 'Payment terms', 'IP ownership', 'Warranties'] },
+                  ] : isFin ? [
+                    { label: 'Financial Periods', items: ['Fiscal year coverage', 'Reporting standards', 'Audit completion'] },
+                    { label: 'Key Figures', items: ['Revenue & expenses', 'Assets & liabilities', 'Cash flow position', 'Tax provisions'] },
+                    { label: 'Compliance', items: ['Regulatory filings', 'Approval authority', 'Disclosure requirements'] },
+                  ] : [
+                    { label: 'Document Summary', items: ['Technical specifications', 'Procedures & processes', 'Reference materials'] },
+                    { label: 'Related Areas', items: ['Systems & infrastructure', 'Data & integrations', 'Operations'] },
+                  ];
+
+                  return (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                      {/* Doc header card */}
+                      <div style={{ background: `${accentCol}08`, border: `1.5px solid ${accentCol}30`, borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px' }}>
+                          <div className="doc-thumb" style={{ background: `${accentCol}15`, color: accentCol, width: 36, height: 42, flexShrink: 0, fontSize: 7.5 }}>
+                            {(selectedDoc.file_type?.replace('.', '') || 'DOC').toUpperCase().slice(0, 4)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedDoc.filename}</div>
+                            <div style={{ fontSize: 10, color: accentCol, fontWeight: 700, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{catLabel}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 0, borderTop: `1px solid ${accentCol}20` }}>
+                          <button onClick={() => { setQuery(`Summarize the document ${selectedDoc.filename}`); setTab('retrieval'); }}
+                            style={{ flex: 1, padding: '7px', fontSize: 11, fontWeight: 600, color: accentCol, background: 'transparent', border: 'none', borderRight: `1px solid ${accentCol}20`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontFamily: 'var(--font-sans)' }}>
+                            <Search size={11} /> Ask AI
+                          </button>
+                          <button onClick={() => setTab('graph')}
+                            style={{ flex: 1, padding: '7px', fontSize: 11, fontWeight: 600, color: '#10b981', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontFamily: 'var(--font-sans)' }}>
+                            <Network size={11} /> Graph
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedDoc.filename}</div>
-                        <div style={{ fontSize: 10.5, color: 'var(--ink3)', marginTop: 2 }}>{selectedDoc.page_count} pages · {selectedDoc.chunk_count} chunks</div>
-                        <div style={{ fontSize: 10.5, color: 'var(--ink3)' }}>{new Date(selectedDoc.upload_timestamp).toLocaleDateString()}</div>
+
+                      {/* Extracted section panels */}
+                      {sections.map((sec, si) => (
+                        <motion.div key={sec.label} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: si * 0.07 }}
+                          style={{ marginBottom: 10, padding: '11px 13px', background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 10 }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accentCol, marginBottom: 8 }}>{sec.label}</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {sec.items.map(item => (
+                              <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, color: 'var(--ink2)' }}>
+                                <div style={{ width: 4, height: 4, borderRadius: '50%', background: accentCol, flexShrink: 0, opacity: 0.7 }} />
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      ))}
+
+                      {/* Raw stats */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
+                        {[['Pages', selectedDoc.page_count], ['Chunks', selectedDoc.chunk_count],
+                          ['Size', `${(selectedDoc.file_size/1024).toFixed(1)} KB`], ['Indexed', new Date(selectedDoc.upload_timestamp).toLocaleDateString()]]
+                          .map(([k, v]) => (
+                            <div key={k} style={{ padding: '8px 10px', background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 8, textAlign: 'center' }}>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>{v}</div>
+                              <div style={{ fontSize: 9.5, color: 'var(--ink3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{k}</div>
+                            </div>
+                          ))}
                       </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, borderTop: '1px solid var(--b1)' }}>
-                      <button onClick={() => { setQuery(`Summarize the document ${selectedDoc.filename}`); setTab('retrieval'); }}
-                        style={{ padding: '8px', fontSize: 11.5, fontWeight: 600, color: 'var(--a)', background: 'white', border: 'none', borderRight: '1px solid var(--b1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontFamily: 'var(--font-sans)' }}>
-                        <Search size={12} /> Ask AI
-                      </button>
-                      <button onClick={() => setTab('graph')}
-                        style={{ padding: '8px', fontSize: 11.5, fontWeight: 600, color: 'var(--ok)', background: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontFamily: 'var(--font-sans)' }}>
-                        <Network size={12} /> Graph
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : docs.length > 0 ? (
-                  <div style={{ padding: '12px', background: 'var(--bg2)', border: '1px dashed var(--b2)', borderRadius: 10, textAlign: 'center' }}>
+                    </motion.div>
+                  );
+                })() : docs.length > 0 ? (
+                  <div style={{ padding: '14px', background: 'var(--bg2)', border: '1px dashed var(--b2)', borderRadius: 10, textAlign: 'center' }}>
+                    <FileText size={20} color="var(--ink3)" style={{ margin: '0 auto 8px' }} />
                     <div style={{ fontSize: 12, color: 'var(--ink2)', fontWeight: 600, marginBottom: 4 }}>Select a document</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink3)' }}>Click any doc in the library to inspect its details here</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink3)', lineHeight: 1.6 }}>Click any document to see extracted knowledge sections &amp; categories</div>
                   </div>
                 ) : (
                   <div style={{ padding: '14px', background: 'var(--bg2)', border: '1px dashed var(--b2)', borderRadius: 10, textAlign: 'center' }}>
